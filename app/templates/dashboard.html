@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecDashboard - DevSecOps Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#22c55e',
+              600: '#16a34a',
+            },
+            darkBg: '#0f172a',
+            cardBg: '#1e293b',
+            cardBorder: '#334155'
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-darkBg text-slate-100 min-h-screen font-sans antialiased">
+
+  <!-- Top Navbar -->
+  <header class="border-b border-cardBorder bg-cardBg/80 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+      <div class="flex items-center space-x-3">
+        <div class="h-10 w-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-xl">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg text-white">SecDashboard</h1>
+          <p class="text-xs text-slate-400">Terraform & DevSecOps Intelligence</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <span class="w-1.5 h-1.5 mr-1.5 rounded-full bg-emerald-400 animate-pulse"></span> DB Connected
+        </span>
+        <button onclick="refreshData()" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium text-slate-200 transition flex items-center space-x-1.5">
+          <i class="fa-solid fa-arrows-rotate"></i>
+          <span>Refresh</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    
+    <!-- Stat Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div class="bg-cardBg border border-cardBorder rounded-2xl p-5 shadow-lg">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Findings</p>
+            <h3 id="stat-total" class="text-3xl font-bold mt-2 text-white">0</h3>
+          </div>
+          <div class="p-2.5 rounded-xl bg-blue-500/10 text-blue-400">
+            <i class="fa-solid fa-layer-group text-lg"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-cardBg border border-red-500/30 rounded-2xl p-5 shadow-lg">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-red-400">Critical</p>
+            <h3 id="stat-critical" class="text-3xl font-bold mt-2 text-red-400">0</h3>
+          </div>
+          <div class="p-2.5 rounded-xl bg-red-500/10 text-red-400">
+            <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-cardBg border border-orange-500/30 rounded-2xl p-5 shadow-lg">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-orange-400">High</p>
+            <h3 id="stat-high" class="text-3xl font-bold mt-2 text-orange-400">0</h3>
+          </div>
+          <div class="p-2.5 rounded-xl bg-orange-500/10 text-orange-400">
+            <i class="fa-solid fa-circle-exclamation text-lg"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-cardBg border border-yellow-500/30 rounded-2xl p-5 shadow-lg">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-yellow-400">Medium</p>
+            <h3 id="stat-medium" class="text-3xl font-bold mt-2 text-yellow-400">0</h3>
+          </div>
+          <div class="p-2.5 rounded-xl bg-yellow-500/10 text-yellow-400">
+            <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-cardBg border border-cardBorder rounded-2xl p-5 shadow-lg">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Low / Info</p>
+            <h3 id="stat-low" class="text-3xl font-bold mt-2 text-slate-300">0</h3>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-500/10 text-slate-400">
+            <i class="fa-solid fa-info-circle text-lg"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="bg-cardBg border border-cardBorder rounded-2xl p-5 shadow-lg">
+        <h4 class="font-semibold text-slate-200 mb-4 flex items-center space-x-2">
+          <i class="fa-solid fa-chart-pie text-emerald-400"></i>
+          <span>Severity Distribution</span>
+        </h4>
+        <div class="h-56 relative flex items-center justify-center">
+          <canvas id="severityChart"></canvas>
+        </div>
+      </div>
+
+      <div class="bg-cardBg border border-cardBorder rounded-2xl p-5 shadow-lg">
+        <h4 class="font-semibold text-slate-200 mb-4 flex items-center space-x-2">
+          <i class="fa-solid fa-toolbox text-blue-400"></i>
+          <span>Findings by Tool</span>
+        </h4>
+        <div class="h-56 relative flex items-center justify-center">
+          <canvas id="toolChart"></canvas>
+        </div>
+      </div>
+
+      <div class="bg-cardBg border border-cardBorder rounded-2xl p-5 shadow-lg">
+        <h4 class="font-semibold text-slate-200 mb-4 flex items-center space-x-2">
+          <i class="fa-solid fa-folder-tree text-purple-400"></i>
+          <span>Top Repositories</span>
+        </h4>
+        <div class="h-56 relative flex items-center justify-center">
+          <canvas id="repoChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters & Search -->
+    <div class="bg-cardBg border border-cardBorder rounded-2xl p-5 shadow-lg space-y-4">
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="relative w-full sm:w-80">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400"></i>
+          <input id="searchInput" type="text" placeholder="Search rules, paths, resources..." 
+                 oninput="debounceSearch()"
+                 class="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition">
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <!-- Tool Filter -->
+          <select id="toolFilter" onchange="loadFindings()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
+            <option value="ALL">All Tools</option>
+            <option value="checkov">Checkov</option>
+            <option value="trivy">Trivy</option>
+            <option value="trufflehog">TruffleHog</option>
+          </select>
+
+          <!-- Severity Filter -->
+          <select id="severityFilter" onchange="loadFindings()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
+            <option value="ALL">All Severities</option>
+            <option value="CRITICAL">Critical</option>
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+          </select>
+
+          <!-- Repo Filter -->
+          <select id="repoFilter" onchange="loadFindings()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
+            <option value="ALL">All Repositories</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Findings Table -->
+    <div class="bg-cardBg border border-cardBorder rounded-2xl shadow-lg overflow-hidden">
+      <div class="px-6 py-4 border-b border-cardBorder flex items-center justify-between">
+        <h3 class="font-semibold text-lg text-white flex items-center space-x-2">
+          <i class="fa-solid fa-list-check text-emerald-400"></i>
+          <span>Security Findings</span>
+        </h3>
+        <span id="resultCount" class="text-xs font-medium text-slate-400 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">0 findings</span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-slate-300">
+          <thead class="bg-slate-900/60 text-xs uppercase text-slate-400 font-semibold border-b border-cardBorder">
+            <tr>
+              <th class="px-6 py-3.5">Severity</th>
+              <th class="px-6 py-3.5">Rule / Issue</th>
+              <th class="px-6 py-3.5">Tool</th>
+              <th class="px-6 py-3.5">Repository & File</th>
+              <th class="px-6 py-3.5 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody id="findingsTableBody" class="divide-y divide-cardBorder/60">
+            <tr>
+              <td colspan="5" class="px-6 py-12 text-center text-slate-400">
+                <i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-emerald-400"></i>
+                <p>Loading findings...</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Finding Detail Modal -->
+  <div id="detailModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-cardBg border border-cardBorder rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-cardBorder flex items-center justify-between bg-slate-900/40">
+        <div class="flex items-center space-x-3">
+          <span id="modalSeverityBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase"></span>
+          <h3 id="modalTitle" class="font-bold text-base text-white truncate max-w-md"></h3>
+        </div>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-white transition p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-4 text-sm">
+        <div>
+          <label class="text-xs font-semibold uppercase text-slate-400">Rule ID / Check</label>
+          <p id="modalRuleId" class="text-slate-200 font-mono text-xs mt-1 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800"></p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-xs font-semibold uppercase text-slate-400">Repository</label>
+            <p id="modalRepo" class="text-slate-200 font-medium mt-1"></p>
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase text-slate-400">Resource / Target</label>
+            <p id="modalResource" class="text-slate-200 font-mono text-xs mt-1 truncate"></p>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs font-semibold uppercase text-slate-400">File Location</label>
+          <p id="modalLocation" class="text-slate-200 font-mono text-xs mt-1 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800"></p>
+        </div>
+
+        <div>
+          <label class="text-xs font-semibold uppercase text-slate-400">Description</label>
+          <p id="modalDescription" class="text-slate-300 mt-1 whitespace-pre-wrap leading-relaxed"></p>
+        </div>
+
+        <div id="modalCodeSection" class="hidden">
+          <label class="text-xs font-semibold uppercase text-slate-400">Code Snippet / Match</label>
+          <pre id="modalCodeSnippet" class="mt-1 p-3 bg-slate-950 border border-slate-800 text-emerald-400 rounded-lg font-mono text-xs overflow-x-auto"></pre>
+        </div>
+
+        <div id="modalGuideSection" class="hidden pt-2">
+          <a id="modalGuideUrl" href="#" target="_blank" class="inline-flex items-center space-x-2 text-emerald-400 hover:text-emerald-300 font-medium text-xs">
+            <span>Official Remediation Guide</span>
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+          </a>
+        </div>
+      </div>
+
+      <div class="px-6 py-3 border-t border-cardBorder bg-slate-900/40 flex justify-end">
+        <button onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm font-medium text-white transition">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentFindings = [];
+    let severityChartInst = null;
+    let toolChartInst = null;
+    let repoChartInst = null;
+    let debounceTimer = null;
+
+    async function initDashboard() {
+      await Promise.all([loadStats(), loadFindings()]);
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/stats');
+        const data = await res.json();
+
+        document.getElementById('stat-total').textContent = data.total;
+        document.getElementById('stat-critical').textContent = data.critical;
+        document.getElementById('stat-high').textContent = data.high;
+        document.getElementById('stat-medium').textContent = data.medium;
+        document.getElementById('stat-low').textContent = data.low;
+
+        // Populate Repo Filter dropdown
+        const repoSelect = document.getElementById('repoFilter');
+        const currentSelected = repoSelect.value;
+        repoSelect.innerHTML = '<option value="ALL">All Repositories</option>';
+        Object.keys(data.by_repo).forEach(r => {
+          const opt = document.createElement('option');
+          opt.value = r;
+          opt.textContent = `${r} (${data.by_repo[r]})`;
+          repoSelect.appendChild(opt);
+        });
+        repoSelect.value = currentSelected;
+
+        renderCharts(data);
+      } catch (err) {
+        console.error('Failed to load stats:', err);
+      }
+    }
+
+    function renderCharts(data) {
+      // 1. Severity Chart
+      const sevCtx = document.getElementById('severityChart').getContext('2d');
+      if (severityChartInst) severityChartInst.destroy();
+      severityChartInst = new Chart(sevCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Critical', 'High', 'Medium', 'Low'],
+          datasets: [{
+            data: [data.critical, data.high, data.medium, data.low],
+            backgroundColor: ['#ef4444', '#f97316', '#eab308', '#64748b'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#94a3b8', boxWidth: 12 } }
+          }
+        }
+      });
+
+      // 2. Tool Chart
+      const toolCtx = document.getElementById('toolChart').getContext('2d');
+      if (toolChartInst) toolChartInst.destroy();
+      const toolLabels = Object.keys(data.by_tool);
+      const toolCounts = Object.values(data.by_tool);
+      toolChartInst = new Chart(toolCtx, {
+        type: 'bar',
+        data: {
+          labels: toolLabels.map(t => t.toUpperCase()),
+          datasets: [{
+            label: 'Findings',
+            data: toolCounts,
+            backgroundColor: '#3b82f6',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+            y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+          }
+        }
+      });
+
+      // 3. Repo Chart
+      const repoCtx = document.getElementById('repoChart').getContext('2d');
+      if (repoChartInst) repoChartInst.destroy();
+      const repoLabels = Object.keys(data.by_repo);
+      const repoCounts = Object.values(data.by_repo);
+      repoChartInst = new Chart(repoCtx, {
+        type: 'pie',
+        data: {
+          labels: repoLabels,
+          datasets: [{
+            data: repoCounts,
+            backgroundColor: ['#a855f7', '#06b6d4', '#ec4899', '#10b981', '#f59e0b'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#94a3b8', boxWidth: 10 } }
+          }
+        }
+      });
+    }
+
+    async function loadFindings() {
+      const tool = document.getElementById('toolFilter').value;
+      const severity = document.getElementById('severityFilter').value;
+      const repo = document.getElementById('repoFilter').value;
+      const search = document.getElementById('searchInput').value.trim();
+
+      const params = new URLSearchParams();
+      if (tool !== 'ALL') params.append('tool', tool);
+      if (severity !== 'ALL') params.append('severity', severity);
+      if (repo !== 'ALL') params.append('repository', repo);
+      if (search) params.append('search', search);
+
+      try {
+        const res = await fetch(`/api/findings?${params.toString()}`);
+        const data = await res.json();
+        currentFindings = data.findings;
+        document.getElementById('resultCount').textContent = `${data.total} findings`;
+
+        renderTable(currentFindings);
+      } catch (err) {
+        console.error('Failed to load findings:', err);
+      }
+    }
+
+    function renderTable(findings) {
+      const tbody = document.getElementById('findingsTableBody');
+      if (!findings || findings.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="px-6 py-12 text-center text-slate-400">
+              <i class="fa-solid fa-circle-check text-3xl mb-2 text-emerald-400"></i>
+              <p class="font-medium text-slate-300">No findings matched your criteria</p>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = findings.map((f, idx) => {
+        const sevClass = getSeverityBadge(f.severity);
+        const toolBadge = getToolBadge(f.tool);
+        return `
+          <tr class="hover:bg-slate-800/50 transition">
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="px-2.5 py-1 rounded-full text-xs font-bold uppercase ${sevClass}">
+                ${f.severity}
+              </span>
+            </td>
+            <td class="px-6 py-4">
+              <div class="font-medium text-white line-clamp-1">${escapeHtml(f.title)}</div>
+              <div class="text-xs text-slate-400 font-mono mt-0.5">${escapeHtml(f.rule_id)}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              ${toolBadge}
+            </td>
+            <td class="px-6 py-4">
+              <div class="font-medium text-slate-200">${escapeHtml(f.repository)}</div>
+              <div class="text-xs text-slate-400 font-mono truncate max-w-xs">${escapeHtml(f.file_path || 'N/A')}${f.line_number ? ':' + f.line_number : ''}</div>
+            </td>
+            <td class="px-6 py-4 text-right whitespace-nowrap">
+              <button onclick="viewDetails(${idx})" class="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 text-xs font-semibold transition">
+                Details
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function getSeverityBadge(sev) {
+      switch(sev) {
+        case 'CRITICAL': return 'bg-red-500/20 text-red-400 border border-red-500/30';
+        case 'HIGH': return 'bg-orange-500/20 text-orange-400 border border-orange-500/30';
+        case 'MEDIUM': return 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30';
+        default: return 'bg-slate-700/50 text-slate-300 border border-slate-600';
+      }
+    }
+
+    function getToolBadge(tool) {
+      switch(tool.toLowerCase()) {
+        case 'checkov': return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30">Checkov</span>';
+        case 'trivy': return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30">Trivy</span>';
+        case 'trufflehog': return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-500/20 text-red-300 border border-red-500/30">TruffleHog</span>';
+        default: return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-700 text-slate-300">${tool}</span>`;
+      }
+    }
+
+    function viewDetails(idx) {
+      const f = currentFindings[idx];
+      if (!f) return;
+
+      document.getElementById('modalTitle').textContent = f.title;
+      document.getElementById('modalRuleId').textContent = f.rule_id || 'N/A';
+      document.getElementById('modalRepo').textContent = f.repository;
+      document.getElementById('modalResource').textContent = f.resource_name || 'N/A';
+      document.getElementById('modalLocation').textContent = (f.file_path || 'N/A') + (f.line_number ? ` (Lines: ${f.line_number})` : '');
+      document.getElementById('modalDescription').textContent = f.description || 'No detailed description provided.';
+
+      const sevBadge = document.getElementById('modalSeverityBadge');
+      sevBadge.textContent = f.severity;
+      sevBadge.className = `px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${getSeverityBadge(f.severity)}`;
+
+      const codeSection = document.getElementById('modalCodeSection');
+      if (f.code_snippet) {
+        document.getElementById('modalCodeSnippet').textContent = f.code_snippet;
+        codeSection.classList.remove('hidden');
+      } else {
+        codeSection.classList.add('hidden');
+      }
+
+      const guideSection = document.getElementById('modalGuideSection');
+      if (f.guideline_url && f.guideline_url.startsWith('http')) {
+        document.getElementById('modalGuideUrl').href = f.guideline_url;
+        guideSection.classList.remove('hidden');
+      } else {
+        guideSection.classList.add('hidden');
+      }
+
+      const modal = document.getElementById('detailModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('detailModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function debounceSearch() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(loadFindings, 300);
+    }
+
+    function refreshData() {
+      initDashboard();
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    document.addEventListener('DOMContentLoaded', initDashboard);
+  </script>
+</body>
+</html>
