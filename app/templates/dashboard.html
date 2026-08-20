@@ -17,7 +17,8 @@
               orange: '#ea580c',
               yellow: '#d97706',
               blue: '#2563eb',
-              slate: '#475569'
+              slate: '#475569',
+              green: '#16a34a'
             }
           }
         }
@@ -33,7 +34,7 @@
 </head>
 <body class="text-slate-800 min-h-screen">
 
-  <!-- Top Dojo Header -->
+  <!-- Top Header -->
   <header class="bg-[#2c3e50] text-white shadow-md sticky top-0 z-30">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14">
       <div class="flex items-center space-x-3">
@@ -45,14 +46,20 @@
         </div>
       </div>
       
-      <div class="flex items-center space-x-4">
-        <div class="flex items-center space-x-2 text-xs text-slate-300">
-          <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
-          <span>PostgreSQL Live</span>
-        </div>
-        <button onclick="refreshData()" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs font-medium text-white transition flex items-center space-x-1.5 shadow-sm">
+      <div class="flex items-center space-x-3">
+        <button onclick="openTriggerModal()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded text-xs font-bold text-white transition flex items-center space-x-1.5 shadow-sm">
+          <i class="fa-solid fa-play text-xs"></i>
+          <span>Trigger Scan</span>
+        </button>
+
+        <a href="/api/export/csv" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs font-medium text-white transition flex items-center space-x-1.5 shadow-sm">
+          <i class="fa-solid fa-file-csv"></i>
+          <span>Export</span>
+        </a>
+
+        <button onclick="refreshData()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs font-medium text-white transition flex items-center space-x-1.5 shadow-sm">
           <i class="fa-solid fa-arrows-rotate"></i>
-          <span>Sync Scans</span>
+          <span>Sync</span>
         </button>
       </div>
     </div>
@@ -190,6 +197,18 @@
             </select>
           </div>
 
+          <!-- Status Filter -->
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-semibold text-slate-500 uppercase">Status:</span>
+            <select id="statusFilter" onchange="loadFindings()" class="bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-blue-500">
+              <option value="ACTIVE">Active Findings</option>
+              <option value="MITIGATED">Mitigated / Fixed</option>
+              <option value="FALSE_POSITIVE">False Positive</option>
+              <option value="RISK_ACCEPTED">Risk Accepted</option>
+              <option value="ALL">All Statuses</option>
+            </select>
+          </div>
+
           <!-- Repo Filter -->
           <div class="flex items-center space-x-2">
             <span class="text-xs font-semibold text-slate-500 uppercase">Repo:</span>
@@ -207,7 +226,7 @@
       <div class="px-5 py-3 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
         <h3 class="font-bold text-sm text-slate-700 flex items-center space-x-2">
           <i class="fa-solid fa-list text-slate-500"></i>
-          <span>Active Vulnerabilities</span>
+          <span>Vulnerability Findings</span>
         </h3>
         <span id="resultCount" class="text-xs font-semibold text-slate-600 bg-slate-200 px-2.5 py-0.5 rounded">0 findings</span>
       </div>
@@ -220,12 +239,13 @@
               <th class="px-4 py-3">Finding / Rule</th>
               <th class="px-4 py-3 w-32">Scanner</th>
               <th class="px-4 py-3">Repository & Location</th>
+              <th class="px-4 py-3 w-24">Status</th>
               <th class="px-4 py-3 text-right w-24">Action</th>
             </tr>
           </thead>
           <tbody id="findingsTableBody" class="divide-y divide-slate-100">
             <tr>
-              <td colspan="5" class="px-4 py-8 text-center text-slate-500">
+              <td colspan="6" class="px-4 py-8 text-center text-slate-500">
                 <i class="fa-solid fa-spinner fa-spin text-xl mb-2 text-blue-500"></i>
                 <p class="text-xs">Loading vulnerabilities...</p>
               </td>
@@ -237,12 +257,70 @@
 
   </main>
 
-  <!-- Detail Modal -->
+  <!-- Trigger Scan Modal -->
+  <div id="triggerModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs hidden items-center justify-center p-4">
+    <div class="bg-white border border-slate-300 rounded-lg max-w-lg w-full shadow-2xl overflow-hidden">
+      <div class="px-5 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <h3 class="font-bold text-sm text-slate-800 flex items-center space-x-2">
+          <i class="fa-solid fa-rocket text-emerald-600"></i>
+          <span>Trigger On-Demand Scan (GitHub Dispatch)</span>
+        </h3>
+        <button onclick="closeTriggerModal()" class="text-slate-400 hover:text-slate-600 transition p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs">
+        <div>
+          <label class="font-bold uppercase text-slate-600 block mb-1">Target Repository</label>
+          <select id="triggerRepoSelect" class="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-slate-800 focus:outline-none focus:border-blue-500">
+            <option value="infra">infra</option>
+            <option value="tf-essentials-module">tf-essentials-module</option>
+            <option value="tf-network-module">tf-network-module</option>
+            <option value="tf-k8s-module">tf-k8s-module</option>
+            <option value="nova-tf-template">nova-tf-template</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="font-bold uppercase text-slate-600 block mb-1">Branch</label>
+            <input id="triggerBranch" type="text" value="main" class="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-slate-800 focus:outline-none focus:border-blue-500">
+          </div>
+          <div>
+            <label class="font-bold uppercase text-slate-600 block mb-1">Workflow File</label>
+            <input id="triggerWorkflow" type="text" value="security-scan.yml" class="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-slate-800 focus:outline-none focus:border-blue-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="font-bold uppercase text-slate-600 block mb-1">GitHub Personal Access Token (PAT)</label>
+          <input id="triggerToken" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx (or uses server token)" class="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-slate-800 focus:outline-none focus:border-blue-500">
+          <p class="text-[10px] text-slate-400 mt-1">Requires <code>repo</code> and <code>workflow</code> permissions.</p>
+        </div>
+
+        <div id="triggerStatusMsg" class="hidden p-2.5 rounded text-xs"></div>
+      </div>
+
+      <div class="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end space-x-2">
+        <button onclick="closeTriggerModal()" class="px-3 py-1.5 rounded bg-slate-200 hover:bg-slate-300 text-xs font-medium text-slate-700 transition">
+          Cancel
+        </button>
+        <button id="btnRunTrigger" onclick="executeTriggerScan()" class="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition flex items-center space-x-1.5 shadow-sm">
+          <i class="fa-solid fa-play"></i>
+          <span>Dispatch Workflow</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Modal with Triage Actions -->
   <div id="detailModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs hidden items-center justify-center p-4">
     <div class="bg-white border border-slate-300 rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
       <div class="px-5 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
         <div class="flex items-center space-x-2">
           <span id="modalSeverityBadge" class="px-2 py-0.5 rounded text-xs font-bold uppercase text-white"></span>
+          <span id="modalStatusBadge" class="px-2 py-0.5 rounded text-xs font-semibold uppercase bg-slate-200 text-slate-700"></span>
           <h3 id="modalTitle" class="font-bold text-sm text-slate-800 truncate max-w-md"></h3>
         </div>
         <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 transition p-1">
@@ -288,6 +366,25 @@
             <i class="fa-solid fa-arrow-up-right-from-square"></i>
           </a>
         </div>
+
+        <!-- DefectDojo Triage Section -->
+        <div class="pt-3 border-t border-slate-200">
+          <label class="font-bold uppercase text-slate-600 block mb-2">Triage Finding Status</label>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="triageCurrentFinding('MITIGATED')" class="px-2.5 py-1 rounded bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-semibold transition">
+              <i class="fa-solid fa-check mr-1"></i> Mark Mitigated
+            </button>
+            <button onclick="triageCurrentFinding('FALSE_POSITIVE')" class="px-2.5 py-1 rounded bg-slate-100 text-slate-800 hover:bg-slate-200 font-semibold transition">
+              <i class="fa-solid fa-ban mr-1"></i> False Positive
+            </button>
+            <button onclick="triageCurrentFinding('RISK_ACCEPTED')" class="px-2.5 py-1 rounded bg-amber-100 text-amber-800 hover:bg-amber-200 font-semibold transition">
+              <i class="fa-solid fa-shield mr-1"></i> Accept Risk
+            </button>
+            <button onclick="triageCurrentFinding('ACTIVE')" class="px-2.5 py-1 rounded bg-blue-100 text-blue-800 hover:bg-blue-200 font-semibold transition">
+              <i class="fa-solid fa-rotate-left mr-1"></i> Re-open
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="px-5 py-2.5 border-t border-slate-200 bg-slate-50 flex justify-end">
@@ -301,6 +398,7 @@
   <script>
     let currentFindings = [];
     let currentActiveTool = 'ALL';
+    let currentActiveFindingIndex = null;
     let severityChartInst = null;
     let toolChartInst = null;
     let repoChartInst = null;
@@ -369,7 +467,6 @@
     }
 
     function renderCharts(data) {
-      // 1. Severity Chart
       const sevCtx = document.getElementById('severityChart').getContext('2d');
       if (severityChartInst) severityChartInst.destroy();
       severityChartInst = new Chart(sevCtx, {
@@ -392,7 +489,6 @@
         }
       });
 
-      // 2. Tool Chart
       const toolCtx = document.getElementById('toolChart').getContext('2d');
       if (toolChartInst) toolChartInst.destroy();
       const toolLabels = Object.keys(data.by_tool || {});
@@ -419,7 +515,6 @@
         }
       });
 
-      // 3. Repo Chart
       const repoCtx = document.getElementById('repoChart').getContext('2d');
       if (repoChartInst) repoChartInst.destroy();
       const repoLabels = Object.keys(data.by_repo || {});
@@ -448,12 +543,14 @@
     async function loadFindings() {
       const tool = currentActiveTool;
       const severity = document.getElementById('severityFilter') ? document.getElementById('severityFilter').value : 'ALL';
+      const status = document.getElementById('statusFilter') ? document.getElementById('statusFilter').value : 'ACTIVE';
       const repo = document.getElementById('repoFilter') ? document.getElementById('repoFilter').value : 'ALL';
       const search = document.getElementById('searchInput') ? document.getElementById('searchInput').value.trim() : '';
 
       const params = new URLSearchParams();
       if (tool && tool !== 'ALL') params.append('tool', tool);
       if (severity && severity !== 'ALL') params.append('severity', severity);
+      if (status && status !== 'ALL') params.append('status', status);
       if (repo && repo !== 'ALL') params.append('repository', repo);
       if (search) params.append('search', search);
       params.append('limit', '500');
@@ -475,7 +572,7 @@
       if (!findings || findings.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="5" class="px-4 py-8 text-center text-slate-500">
+            <td colspan="6" class="px-4 py-8 text-center text-slate-500">
               <i class="fa-solid fa-circle-check text-2xl mb-1 text-emerald-500"></i>
               <p class="text-xs font-semibold">No vulnerabilities found for this filter</p>
             </td>
@@ -487,6 +584,7 @@
       tbody.innerHTML = findings.map((f, idx) => {
         const sevBadge = getSeverityBadge(f.severity);
         const toolBadge = getToolBadge(f.tool);
+        const statusBadge = getStatusBadge(f.status);
         return `
           <tr class="hover:bg-slate-50 transition">
             <td class="px-4 py-2.5 whitespace-nowrap">
@@ -502,6 +600,9 @@
             <td class="px-4 py-2.5">
               <div class="font-medium text-slate-700">${escapeHtml(f.repository)}</div>
               <div class="text-xs text-slate-500 font-mono truncate max-w-xs">${escapeHtml(f.file_path || 'N/A')}${f.line_number ? ':' + f.line_number : ''}</div>
+            </td>
+            <td class="px-4 py-2.5 whitespace-nowrap">
+              ${statusBadge}
             </td>
             <td class="px-4 py-2.5 text-right whitespace-nowrap">
               <button onclick="viewDetails(${idx})" class="px-2.5 py-1 rounded bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 text-xs font-medium transition">
@@ -531,7 +632,17 @@
       }
     }
 
+    function getStatusBadge(status) {
+      switch(status) {
+        case 'MITIGATED': return '<span class="px-2 py-0.5 rounded text-xs font-semibold uppercase bg-emerald-100 text-emerald-800">Mitigated</span>';
+        case 'FALSE_POSITIVE': return '<span class="px-2 py-0.5 rounded text-xs font-semibold uppercase bg-slate-200 text-slate-700">False Pos</span>';
+        case 'RISK_ACCEPTED': return '<span class="px-2 py-0.5 rounded text-xs font-semibold uppercase bg-amber-100 text-amber-800">Accepted</span>';
+        default: return '<span class="px-2 py-0.5 rounded text-xs font-semibold uppercase bg-blue-100 text-blue-800">Active</span>';
+      }
+    }
+
     function viewDetails(idx) {
+      currentActiveFindingIndex = idx;
       const f = currentFindings[idx];
       if (!f) return;
 
@@ -545,6 +656,9 @@
       const sevBadge = document.getElementById('modalSeverityBadge');
       sevBadge.textContent = f.severity;
       sevBadge.className = `px-2 py-0.5 rounded text-xs font-bold uppercase ${f.severity === 'CRITICAL' ? 'bg-red-600' : f.severity === 'HIGH' ? 'bg-orange-500' : f.severity === 'MEDIUM' ? 'bg-amber-500' : 'bg-blue-600'} text-white`;
+
+      const statusBadge = document.getElementById('modalStatusBadge');
+      statusBadge.textContent = f.status || 'ACTIVE';
 
       const codeSection = document.getElementById('modalCodeSection');
       if (f.code_snippet) {
@@ -565,6 +679,84 @@
       const modal = document.getElementById('detailModal');
       modal.classList.remove('hidden');
       modal.classList.add('flex');
+    }
+
+    async function triageCurrentFinding(newStatus) {
+      if (currentActiveFindingIndex === null) return;
+      const f = currentFindings[currentActiveFindingIndex];
+      if (!f) return;
+
+      try {
+        const res = await fetch(`/api/findings/${f.id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus })
+        });
+        if (res.ok) {
+          f.status = newStatus;
+          document.getElementById('modalStatusBadge').textContent = newStatus;
+          await loadStats();
+          await loadFindings();
+        }
+      } catch (err) {
+        console.error('Failed to triage finding:', err);
+      }
+    }
+
+    function openTriggerModal() {
+      const savedToken = localStorage.getItem('sec_github_token');
+      if (savedToken) document.getElementById('triggerToken').value = savedToken;
+      document.getElementById('triggerStatusMsg').className = 'hidden';
+      document.getElementById('triggerModal').classList.remove('hidden');
+      document.getElementById('triggerModal').classList.add('flex');
+    }
+
+    function closeTriggerModal() {
+      document.getElementById('triggerModal').classList.add('hidden');
+      document.getElementById('triggerModal').classList.remove('flex');
+    }
+
+    async function executeTriggerScan() {
+      const repo = document.getElementById('triggerRepoSelect').value;
+      const branch = document.getElementById('triggerBranch').value.trim() || 'main';
+      const workflow = document.getElementById('triggerWorkflow').value.trim() || 'security-scan.yml';
+      const token = document.getElementById('triggerToken').value.trim();
+
+      if (token) localStorage.setItem('sec_github_token', token);
+
+      const btn = document.getElementById('btnRunTrigger');
+      const statusBox = document.getElementById('triggerStatusMsg');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Dispatching...';
+
+      try {
+        const res = await fetch('/api/scans/trigger-github', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            owner: 'PipeOpsHQ',
+            repository: repo,
+            branch: branch,
+            workflow_id: workflow,
+            github_token: token || null
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          statusBox.className = 'p-2.5 rounded text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 block';
+          statusBox.textContent = `✓ Dispatched scan for ${repo} (${branch})! GitHub Actions is running now.`;
+          await loadStats();
+        } else {
+          statusBox.className = 'p-2.5 rounded text-xs bg-red-50 text-red-800 border border-red-200 block';
+          statusBox.textContent = `Error: ${data.detail || 'Failed to dispatch workflow'}`;
+        }
+      } catch (err) {
+        statusBox.className = 'p-2.5 rounded text-xs bg-red-50 text-red-800 border border-red-200 block';
+        statusBox.textContent = `Network Error: ${err.message}`;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-play mr-1"></i> Dispatch Workflow';
+      }
     }
 
     function closeModal() {

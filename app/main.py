@@ -1,12 +1,17 @@
 import json
 import os
+import shutil
+import tempfile
+import subprocess
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional, List
-from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+import requests
+from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, Request, BackgroundTasks, Body
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, text, case
 
@@ -18,7 +23,7 @@ async def lifespan(app: FastAPI):
     init_db()
     yield
 
-app = FastAPI(title="DefectDojo Lite - DevSecOps Portal", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="DefectDojo Lite - DevSecOps Portal", version="2.0.0", lifespan=lifespan)
 
 # Setup template and static folders
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -30,7 +35,7 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 def normalize_repo_name(name: str) -> str:
     if not name:
         return "unknown"
-    n = name.strip().rstrip("/")
+    n = name.strip().rstrip("/").split("/")[-1].replace(".git", "")
     if n == "tf-essential-module":
         return "tf-essentials-module"
     return n
@@ -84,7 +89,7 @@ async def upload_scan(
     elif tool == "trufflehog":
         raw_findings = parse_trufflehog(content_str, repository)
 
-    # Deactivate previous active findings for this (repo, tool) so scans don't duplicate
+    # Deactivate previous active findings for this (repo, tool)
     db.query(Finding).filter(
         Finding.repository == repository,
         Finding.tool == tool,
@@ -103,6 +108,8 @@ async def upload_scan(
         repository=repository,
         branch=branch or "main",
         commit_sha=commit_sha or "",
+        status="COMPLETED",
+        triggered_by="CI",
         total_findings=len(raw_findings),
         critical_count=crit,
         high_count=high,
@@ -128,6 +135,7 @@ async def upload_scan(
             resource_name=f["resource_name"],
             guideline_url=f["guideline_url"],
             code_snippet=f["code_snippet"],
+            status="ACTIVE",
             is_active=True,
             created_at=datetime.utcnow()
         )
@@ -149,18 +157,97 @@ async def upload_scan(
         "low": low
     }
 
+class TriggerGithubScanRequest(BaseModel):
+    owner: str = "PipeOpsHQ"
+    repository: str
+    branch: str = "main"
+    workflow_id: str = "security-scan.yml"
+    github_token: Optional[str] = None
+
+@app.post("/api/scans/trigger-github")
+def trigger_github_workflow(req: TriggerGithubScanRequest, db: Session = Depends(get_db)):
+    """Triggers GitHub Actions workflow via workflow_dispatch API."""
+    token = req.github_token or os.getenv("GITHUB_TOKEN")
+    if not token:
+        raise HTTPException(
+            status_code=400, 
+            detail="GitHub Token is required. Set GITHUB_TOKEN env var or provide it in request."
+        )
+
+    url = f"https://api.github.com/repos/{req.owner}/{req.repository}/actions/workflows/{req.workflow_id}/dispatches"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+    }
+    payload = {"ref": req.branch}
+
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=10)
+        if resp.status_code == 204:
+            # Create a placeholder scan record
+            scan = Scan(
+                tool="all",
+                repository=normalize_repo_name(req.repository),
+                branch=req.branch,
+                status="RUNNING",
+                triggered_by="GITHUB_DISPATCH",
+                logs=f"Triggered workflow {req.workflow_id} on branch {req.branch}",
+                created_at=datetime.utcnow()
+            )
+            db.add(scan)
+            db.commit()
+
+            return {
+                "status": "success",
+                "message": f"Successfully triggered {req.workflow_id} on {req.owner}/{req.repository} ({req.branch})",
+                "scan_id": scan.id
+            }
+        else:
+            raise HTTPException(status_code=resp.status_code, detail=f"GitHub API Error: {resp.text}")
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reach GitHub API: {str(e)}")
+
+class UpdateFindingStatusRequest(BaseModel):
+    status: str # ACTIVE, MITIGATED, FALSE_POSITIVE, RISK_ACCEPTED
+    notes: Optional[str] = ""
+
+@app.patch("/api/findings/{finding_id}/status")
+def update_finding_status(finding_id: int, req: UpdateFindingStatusRequest, db: Session = Depends(get_db)):
+    """Allows security analysts to triage findings (Mitigate, False Positive, Risk Accept)."""
+    valid_statuses = ["ACTIVE", "MITIGATED", "FALSE_POSITIVE", "RISK_ACCEPTED"]
+    new_status = req.status.upper().strip()
+    if new_status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Choose from: {valid_statuses}")
+
+    finding = db.query(Finding).filter(Finding.id == finding_id).first()
+    if not finding:
+        raise HTTPException(status_code=404, detail="Finding not found")
+
+    finding.status = new_status
+    if new_status != "ACTIVE":
+        finding.is_active = False
+    else:
+        finding.is_active = True
+
+    if req.notes:
+        finding.notes = req.notes
+
+    db.commit()
+    return {"status": "success", "finding_id": finding.id, "new_status": finding.status}
+
 @app.get("/api/stats")
 def get_stats(db: Session = Depends(get_db)):
-    # Normalize any legacy findings repo name
-    db.query(Finding).filter(Finding.repository == "tf-essential-module").update({"repository": "tf-essentials-module"})
-    db.query(Scan).filter(Scan.repository == "tf-essential-module").update({"repository": "tf-essentials-module"})
-    db.commit()
-
     total_findings = db.query(Finding).filter(Finding.is_active == True).count()
     crit = db.query(Finding).filter(Finding.is_active == True, Finding.severity == "CRITICAL").count()
     high = db.query(Finding).filter(Finding.is_active == True, Finding.severity == "HIGH").count()
     med = db.query(Finding).filter(Finding.is_active == True, Finding.severity == "MEDIUM").count()
     low = db.query(Finding).filter(Finding.is_active == True, Finding.severity == "LOW").count()
+
+    # Status counts
+    mitigated = db.query(Finding).filter(Finding.status == "MITIGATED").count()
+    false_pos = db.query(Finding).filter(Finding.status == "FALSE_POSITIVE").count()
+    risk_accepted = db.query(Finding).filter(Finding.status == "RISK_ACCEPTED").count()
 
     # Tool breakdown
     tool_counts = db.query(Finding.tool, func.count(Finding.id)).filter(Finding.is_active == True).group_by(Finding.tool).all()
@@ -173,6 +260,12 @@ def get_stats(db: Session = Depends(get_db)):
         "high": high,
         "medium": med,
         "low": low,
+        "status_counts": {
+            "active": total_findings,
+            "mitigated": mitigated,
+            "false_positive": false_pos,
+            "risk_accepted": risk_accepted
+        },
         "by_tool": {t: c for t, c in tool_counts},
         "by_repo": {r: c for r, c in repo_counts},
         "total_scans": db.query(Scan).count()
@@ -183,12 +276,18 @@ def get_findings(
     tool: Optional[str] = None,
     repository: Optional[str] = None,
     severity: Optional[str] = None,
+    status: Optional[str] = None, # ACTIVE, MITIGATED, etc.
     search: Optional[str] = None,
     limit: int = 500,
     offset: int = 0,
     db: Session = Depends(get_db)
 ):
-    query = db.query(Finding).filter(Finding.is_active == True)
+    query = db.query(Finding)
+
+    if status and status != "ALL":
+        query = query.filter(Finding.status == status.upper())
+    else:
+        query = query.filter(Finding.is_active == True)
 
     if tool and tool != "ALL":
         query = query.filter(Finding.tool == tool.lower())
@@ -236,6 +335,8 @@ def get_findings(
                 "resource_name": f.resource_name,
                 "guideline_url": f.guideline_url,
                 "code_snippet": f.code_snippet,
+                "status": f.status or "ACTIVE",
+                "notes": f.notes or "",
                 "created_at": f.created_at.strftime("%Y-%m-%d %H:%M:%S")
             }
             for f in results
@@ -252,6 +353,9 @@ def get_scans(limit: int = 100, db: Session = Depends(get_db)):
             "repository": s.repository,
             "branch": s.branch,
             "commit_sha": s.commit_sha,
+            "status": s.status or "COMPLETED",
+            "triggered_by": s.triggered_by or "CI",
+            "logs": s.logs or "",
             "total_findings": s.total_findings,
             "critical": s.critical_count,
             "high": s.high_count,
@@ -261,6 +365,18 @@ def get_scans(limit: int = 100, db: Session = Depends(get_db)):
         }
         for s in scans
     ]
+
+@app.get("/api/export/csv")
+def export_csv(db: Session = Depends(get_db)):
+    """Exports active findings to CSV."""
+    findings = db.query(Finding).filter(Finding.is_active == True).all()
+    lines = ["ID,Severity,Tool,Repository,Rule ID,Title,File Path,Resource,Status,Created At"]
+    for f in findings:
+        title = f.title.replace('"', '""') if f.title else ""
+        lines.append(f'"{f.id}","{f.severity}","{f.tool}","{f.repository}","{f.rule_id}","{title}","{f.file_path}","{f.resource_name}","{f.status}","{f.created_at}"')
+    
+    csv_content = "\n".join(lines)
+    return Response(content=csv_content, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=sec_dashboard_findings.csv"})
 
 @app.get("/", response_class=HTMLResponse)
 def serve_dashboard(request: Request):
