@@ -4,7 +4,6 @@ import logging
 from datetime import datetime
 from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Index, text
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
-from sqlalchemy.exc import OperationalError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("sec-dashboard")
@@ -35,10 +34,13 @@ class Scan(Base):
     __tablename__ = "scans"
 
     id = Column(Integer, primary_key=True, index=True)
-    tool = Column(String(50), nullable=False, index=True) # checkov, trivy, trufflehog
+    tool = Column(String(50), nullable=False, index=True) # checkov, trivy, trufflehog, all
     repository = Column(String(255), nullable=False, index=True)
     branch = Column(String(100), default="main")
     commit_sha = Column(String(100), default="")
+    status = Column(String(30), default="COMPLETED") # RUNNING, COMPLETED, FAILED
+    triggered_by = Column(String(50), default="CI") # CI, DASHBOARD_DIRECT, GITHUB_DISPATCH
+    logs = Column(Text, default="")
     total_findings = Column(Integer, default=0)
     critical_count = Column(Integer, default=0)
     high_count = Column(Integer, default=0)
@@ -64,13 +66,16 @@ class Finding(Base):
     resource_name = Column(String(255), default="")
     guideline_url = Column(String(500), default="")
     code_snippet = Column(Text, default="")
+    status = Column(String(30), default="ACTIVE", index=True) # ACTIVE, MITIGATED, FALSE_POSITIVE, RISK_ACCEPTED
     is_active = Column(Boolean, default=True, index=True)
+    notes = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     scan = relationship("Scan", back_populates="findings")
 
 Index("idx_finding_repo_tool", Finding.repository, Finding.tool)
 Index("idx_finding_severity", Finding.severity)
+Index("idx_finding_status", Finding.status)
 
 def init_db(max_retries: int = 5, retry_interval: int = 2):
     """Initializes the database schema with automatic retries."""
