@@ -1,7 +1,7 @@
 import json
 from typing import List, Dict, Any
 
-def normalize_severity(sev: str) -> str:
+def normalize_severity(sev: Any) -> str:
     if not sev:
         return "MEDIUM"
     s = str(sev).strip().upper()
@@ -17,8 +17,6 @@ def normalize_severity(sev: str) -> str:
 
 def parse_checkov(data: Any, repo: str) -> List[Dict[str, Any]]:
     findings = []
-    
-    # Checkov can output a single dict or a list of dicts (multi-framework)
     framework_runs = data if isinstance(data, list) else [data]
 
     for run in framework_runs:
@@ -26,26 +24,34 @@ def parse_checkov(data: Any, repo: str) -> List[Dict[str, Any]]:
             continue
         
         results = run.get("results", {})
+        if not isinstance(results, dict):
+            continue
+
         failed_checks = results.get("failed_checks", [])
+        if not isinstance(failed_checks, list):
+            continue
 
         for check in failed_checks:
-            file_line_range = check.get("file_line_range", [])
+            if not isinstance(check, dict):
+                continue
+            
+            file_line_range = check.get("file_line_range") or []
             line_str = f"{file_line_range[0]}-{file_line_range[1]}" if len(file_line_range) >= 2 else str(file_line_range[0]) if file_line_range else ""
             
-            code_lines = check.get("code_block", [])
-            snippet = "\n".join([f"{num}: {line}" for num, line in code_lines]) if code_lines else ""
+            code_lines = check.get("code_block") or []
+            snippet = "\n".join([f"{num}: {line}" for num, line in code_lines]) if isinstance(code_lines, list) else ""
 
             findings.append({
                 "tool": "checkov",
                 "repository": repo,
-                "title": check.get("check_name", "Checkov Finding"),
+                "title": check.get("check_name") or "Checkov Finding",
                 "description": f"Resource {check.get('resource', '')} failed check {check.get('check_id', '')}",
                 "severity": normalize_severity(check.get("severity") or check.get("bc_severity") or "MEDIUM"),
-                "rule_id": check.get("check_id", ""),
-                "file_path": check.get("file_path", ""),
+                "rule_id": check.get("check_id") or "",
+                "file_path": check.get("file_path") or "",
                 "line_number": line_str,
-                "resource_name": check.get("resource", ""),
-                "guideline_url": check.get("guideline", ""),
+                "resource_name": check.get("resource") or "",
+                "guideline_url": check.get("guideline") or "",
                 "code_snippet": snippet
             })
     return findings
@@ -55,59 +61,74 @@ def parse_trivy(data: Any, repo: str) -> List[Dict[str, Any]]:
     if not isinstance(data, dict):
         return findings
 
-    results = data.get("Results", [])
+    results = data.get("Results") or []
     for res in results:
-        target = res.get("Target", "")
+        if not isinstance(res, dict):
+            continue
+        target = res.get("Target") or ""
 
         # 1. Misconfigurations (IaC & Cloud)
-        for mis in res.get("Misconfigurations", []):
-            code_lines = mis.get("Code", {}).get("Lines", [])
-            snippet = "\n".join([f"{l.get('Number', '')}: {l.get('Content', '')}" for l in code_lines]) if code_lines else ""
+        for mis in (res.get("Misconfigurations") or []):
+            if not isinstance(mis, dict):
+                continue
+            
+            code_obj = mis.get("Code") or {}
+            code_lines = code_obj.get("Lines") if isinstance(code_obj, dict) else []
+            snippet = "\n".join([f"{l.get('Number', '')}: {l.get('Content', '')}" for l in code_lines]) if isinstance(code_lines, list) else ""
+            
+            cause_meta = mis.get("CauseMetadata") or {}
+            resource_name = cause_meta.get("Resource") if isinstance(cause_meta, dict) else ""
+            
+            line_num = str(code_lines[0].get("Number", "")) if isinstance(code_lines, list) and code_lines else ""
 
             findings.append({
                 "tool": "trivy",
                 "repository": repo,
-                "title": mis.get("Title", mis.get("ID", "Trivy Misconfiguration")),
-                "description": mis.get("Description", mis.get("Message", "")),
-                "severity": normalize_severity(mis.get("Severity", "MEDIUM")),
-                "rule_id": mis.get("ID", mis.get("AVDID", "")),
+                "title": mis.get("Title") or mis.get("ID") or "Trivy Misconfiguration",
+                "description": mis.get("Description") or mis.get("Message") or (mis.get("Resolution") if isinstance(mis.get("Resolution"), str) else ""),
+                "severity": normalize_severity(mis.get("Severity") or "MEDIUM"),
+                "rule_id": mis.get("ID") or mis.get("AVDID") or "",
                 "file_path": target,
-                "line_number": str(mis.get("Resolution", {}).get("StartLine", "") or (code_lines[0].get("Number") if code_lines else "")),
-                "resource_name": mis.get("Resolution", {}).get("Resource", ""),
-                "guideline_url": mis.get("PrimaryURL", f"https://avd.aquasec.com/misconfig/{mis.get('ID', '').lower()}"),
+                "line_number": line_num,
+                "resource_name": resource_name,
+                "guideline_url": mis.get("PrimaryURL") or f"https://avd.aquasec.com/misconfig/{str(mis.get('ID', '')).lower()}",
                 "code_snippet": snippet
             })
 
         # 2. Vulnerabilities (CVEs)
-        for vuln in res.get("Vulnerabilities", []):
+        for vuln in (res.get("Vulnerabilities") or []):
+            if not isinstance(vuln, dict):
+                continue
             findings.append({
                 "tool": "trivy",
                 "repository": repo,
                 "title": f"{vuln.get('PkgName', '')} {vuln.get('InstalledVersion', '')} - {vuln.get('VulnerabilityID', '')}",
-                "description": vuln.get("Description", vuln.get("Title", "")),
-                "severity": normalize_severity(vuln.get("Severity", "MEDIUM")),
-                "rule_id": vuln.get("VulnerabilityID", ""),
+                "description": vuln.get("Description") or vuln.get("Title") or "",
+                "severity": normalize_severity(vuln.get("Severity") or "MEDIUM"),
+                "rule_id": vuln.get("VulnerabilityID") or "",
                 "file_path": target,
                 "line_number": "",
-                "resource_name": vuln.get("PkgName", ""),
-                "guideline_url": vuln.get("PrimaryURL", ""),
+                "resource_name": vuln.get("PkgName") or "",
+                "guideline_url": vuln.get("PrimaryURL") or "",
                 "code_snippet": f"Fixed Version: {vuln.get('FixedVersion', 'N/A')}"
             })
             
-        # 3. Secrets (Trivy secret scanning)
-        for secret in res.get("Secrets", []):
+        # 3. Secrets
+        for secret in (res.get("Secrets") or []):
+            if not isinstance(secret, dict):
+                continue
             findings.append({
                 "tool": "trivy",
                 "repository": repo,
-                "title": f"Exposed Secret: {secret.get('Title', secret.get('RuleID', 'Secret'))}",
+                "title": f"Exposed Secret: {secret.get('Title') or secret.get('RuleID') or 'Secret'}",
                 "description": f"Category: {secret.get('Category', '')}",
-                "severity": normalize_severity(secret.get("Severity", "CRITICAL")),
-                "rule_id": secret.get("RuleID", "Secret"),
+                "severity": normalize_severity(secret.get("Severity") or "CRITICAL"),
+                "rule_id": secret.get("RuleID") or "Secret",
                 "file_path": target,
-                "line_number": str(secret.get("StartLine", "")),
-                "resource_name": secret.get("Target", ""),
+                "line_number": str(secret.get("StartLine") or ""),
+                "resource_name": secret.get("Target") or "",
                 "guideline_url": "",
-                "code_snippet": secret.get("Match", "")
+                "code_snippet": secret.get("Match") or ""
             })
 
     return findings
@@ -124,15 +145,19 @@ def parse_trufflehog(raw_content: str, repo: str) -> List[Dict[str, Any]]:
         except Exception:
             continue
         
-        detector = item.get("DetectorName", item.get("detector_name", "Secret Detector"))
-        verified = item.get("Verified", item.get("verified", False))
-        raw = item.get("Raw", item.get("raw", ""))
-        redacted = item.get("Redacted", item.get("redacted", ""))
+        if not isinstance(item, dict):
+            continue
+
+        detector = item.get("DetectorName") or item.get("detector_name") or "Secret Detector"
+        verified = item.get("Verified") if item.get("Verified") is not None else item.get("verified", False)
+        raw = item.get("Raw") or item.get("raw") or ""
+        redacted = item.get("Redacted") or item.get("redacted") or ""
         
-        src_meta = item.get("SourceMetadata", {}).get("Data", {}).get("Git", {})
-        file_path = src_meta.get("file", item.get("path", ""))
-        line_num = str(src_meta.get("line", ""))
-        commit = src_meta.get("commit", "")
+        src_meta = item.get("SourceMetadata") or {}
+        git_meta = src_meta.get("Data", {}).get("Git", {}) if isinstance(src_meta, dict) else {}
+        file_path = git_meta.get("file") or item.get("path") or ""
+        line_num = str(git_meta.get("line") or "")
+        commit = git_meta.get("commit") or ""
 
         findings.append({
             "tool": "trufflehog",
@@ -140,7 +165,7 @@ def parse_trufflehog(raw_content: str, repo: str) -> List[Dict[str, Any]]:
             "title": f"Leaked Secret: {detector} ({'VERIFIED ACTIVE' if verified else 'Unverified'})",
             "description": f"Commit: {commit}\nVerified: {verified}",
             "severity": "CRITICAL" if verified else "HIGH",
-            "rule_id": detector,
+            "rule_id": str(detector),
             "file_path": file_path,
             "line_number": line_num,
             "resource_name": commit,
