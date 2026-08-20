@@ -26,11 +26,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set Image Tag
+        id: image_tag
+        run: |
+          # Lowercase repo name for Docker compatibility
+          IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/sec-dashboard"
+          echo "image=${IMAGE_NAME,,}" >> $GITHUB_OUTPUT
+
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/sec-dashboard:latest
-            ghcr.io/${{ github.repository_owner }}/sec-dashboard:${{ github.sha }}
+            ${{ steps.image_tag.outputs.image }}:latest
+            ${{ steps.image_tag.outputs.image }}:${{ github.sha }}
