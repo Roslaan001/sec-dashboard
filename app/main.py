@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, text, case
 
 from .database import init_db, get_db, Scan, Finding, engine
-from .parsers import parse_checkov, parse_trivy, parse_trufflehog
+from .parsers import parse_checkov, parse_trivy, parse_trufflehog, parse_gitleaks
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -25,7 +25,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="DefectDojo Lite - DevSecOps Portal", version="2.0.0", lifespan=lifespan)
 
-# Setup template and static folders
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 static_dir = os.path.join(BASE_DIR, "static")
 os.makedirs(static_dir, exist_ok=True)
@@ -58,7 +57,7 @@ def health():
 @app.post("/api/upload")
 async def upload_scan(
     file: UploadFile = File(...),
-    tool: str = Form(...), # checkov, trivy, trufflehog
+    tool: str = Form(...), # checkov, trivy, trufflehog, gitleaks
     repository: str = Form(...),
     branch: Optional[str] = Form("main"),
     commit_sha: Optional[str] = Form(""),
@@ -67,8 +66,9 @@ async def upload_scan(
     tool = tool.lower().strip()
     repository = normalize_repo_name(repository)
 
-    if tool not in ["checkov", "trivy", "trufflehog"]:
-        raise HTTPException(status_code=400, detail="Supported tools: checkov, trivy, trufflehog")
+    valid_tools = ["checkov", "trivy", "trufflehog", "gitleaks"]
+    if tool not in valid_tools:
+        raise HTTPException(status_code=400, detail=f"Supported tools: {', '.join(valid_tools)}")
 
     content_bytes = await file.read()
     content_str = content_bytes.decode("utf-8", errors="ignore")
@@ -88,6 +88,12 @@ async def upload_scan(
             raise HTTPException(status_code=400, detail=f"Failed to parse Trivy JSON: {str(e)}")
     elif tool == "trufflehog":
         raw_findings = parse_trufflehog(content_str, repository)
+    elif tool == "gitleaks":
+        try:
+            data = json.loads(content_str)
+            raw_findings = parse_gitleaks(data, repository)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to parse Gitleaks JSON: {str(e)}")
 
     # Deactivate previous active findings for this (repo, tool)
     db.query(Finding).filter(
@@ -185,7 +191,6 @@ def trigger_github_workflow(req: TriggerGithubScanRequest, db: Session = Depends
     try:
         resp = requests.post(url, headers=headers, json=payload, timeout=10)
         if resp.status_code == 204:
-            # Create a placeholder scan record
             scan = Scan(
                 tool="all",
                 repository=normalize_repo_name(req.repository),
@@ -214,7 +219,6 @@ class UpdateFindingStatusRequest(BaseModel):
 
 @app.patch("/api/findings/{finding_id}/status")
 def update_finding_status(finding_id: int, req: UpdateFindingStatusRequest, db: Session = Depends(get_db)):
-    """Allows security analysts to triage findings (Mitigate, False Positive, Risk Accept)."""
     valid_statuses = ["ACTIVE", "MITIGATED", "FALSE_POSITIVE", "RISK_ACCEPTED"]
     new_status = req.status.upper().strip()
     if new_status not in valid_statuses:
@@ -244,14 +248,11 @@ def get_stats(db: Session = Depends(get_db)):
     med = db.query(Finding).filter(Finding.is_active == True, Finding.severity == "MEDIUM").count()
     low = db.query(Finding).filter(Finding.is_active == True, Finding.severity == "LOW").count()
 
-    # Status counts
     mitigated = db.query(Finding).filter(Finding.status == "MITIGATED").count()
     false_pos = db.query(Finding).filter(Finding.status == "FALSE_POSITIVE").count()
     risk_accepted = db.query(Finding).filter(Finding.status == "RISK_ACCEPTED").count()
 
-    # Tool breakdown
     tool_counts = db.query(Finding.tool, func.count(Finding.id)).filter(Finding.is_active == True).group_by(Finding.tool).all()
-    # Repo breakdown
     repo_counts = db.query(Finding.repository, func.count(Finding.id)).filter(Finding.is_active == True).group_by(Finding.repository).all()
 
     return {
@@ -276,7 +277,7 @@ def get_findings(
     tool: Optional[str] = None,
     repository: Optional[str] = None,
     severity: Optional[str] = None,
-    status: Optional[str] = None, # ACTIVE, MITIGATED, etc.
+    status: Optional[str] = None,
     search: Optional[str] = None,
     limit: int = 500,
     offset: int = 0,
@@ -368,7 +369,6 @@ def get_scans(limit: int = 100, db: Session = Depends(get_db)):
 
 @app.get("/api/export/csv")
 def export_csv(db: Session = Depends(get_db)):
-    """Exports active findings to CSV."""
     findings = db.query(Finding).filter(Finding.is_active == True).all()
     lines = ["ID,Severity,Tool,Repository,Rule ID,Title,File Path,Resource,Status,Created At"]
     for f in findings:

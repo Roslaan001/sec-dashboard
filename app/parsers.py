@@ -174,3 +174,35 @@ def parse_trufflehog(raw_content: str, repo: str) -> List[Dict[str, Any]]:
         })
 
     return findings
+
+def parse_gitleaks(data: Any, repo: str) -> List[Dict[str, Any]]:
+    findings = []
+    items = data if isinstance(data, list) else []
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+
+        desc = item.get("Description") or item.get("RuleID") or "Leaked Secret"
+        rule_id = item.get("RuleID") or "gitleaks-secret"
+        file_path = item.get("File") or ""
+        line_num = str(item.get("StartLine") or "")
+        commit = item.get("Commit") or ""
+        secret = item.get("Secret") or item.get("Match") or ""
+        author = item.get("Author") or ""
+
+        findings.append({
+            "tool": "gitleaks",
+            "repository": repo,
+            "title": f"Leaked Secret: {desc}",
+            "description": f"Rule: {rule_id}\nCommit: {commit}\nAuthor: {author}",
+            "severity": "HIGH",
+            "rule_id": rule_id,
+            "file_path": file_path,
+            "line_number": line_num,
+            "resource_name": commit,
+            "guideline_url": "https://github.com/gitleaks/gitleaks",
+            "code_snippet": f"Secret Match: {secret}"
+        })
+
+    return findings
