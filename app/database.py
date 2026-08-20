@@ -1,7 +1,13 @@
 import os
+import time
+import logging
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Index
+from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Index, text
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+from sqlalchemy.exc import OperationalError
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("sec-dashboard")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sec_dashboard.db")
 
@@ -9,9 +15,19 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sec_dashboard.db")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# Handle engine args for SQLite vs Postgres
-connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
-engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
+# Handle engine args
+engine_args = {
+    "pool_pre_ping": True,
+}
+
+if "sqlite" in DATABASE_URL:
+    engine_args["connect_args"] = {"check_same_thread": False}
+else:
+    engine_args["pool_size"] = 10
+    engine_args["max_overflow"] = 20
+    engine_args["pool_recycle"] = 300
+
+engine = create_engine(DATABASE_URL, **engine_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -56,8 +72,22 @@ class Finding(Base):
 Index("idx_finding_repo_tool", Finding.repository, Finding.tool)
 Index("idx_finding_severity", Finding.severity)
 
-def init_db():
-    Base.metadata.create_all(bind=engine)
+def init_db(max_retries: int = 5, retry_interval: int = 2):
+    """Initializes the database schema with automatic retries."""
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"Connecting to database (attempt {attempt}/{max_retries})...")
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            Base.metadata.create_all(bind=engine)
+            logger.info("Database initialized successfully!")
+            return
+        except Exception as e:
+            logger.warning(f"Database connection attempt {attempt} failed: {e}")
+            if attempt < max_retries:
+                time.sleep(retry_interval)
+            else:
+                logger.error("Could not connect to database after maximum retries. Continuing startup...")
 
 def get_db():
     db = SessionLocal()

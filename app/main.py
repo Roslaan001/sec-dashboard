@@ -1,5 +1,6 @@
 import json
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional, List
 from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, Request
@@ -7,25 +8,40 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, text
 
-from .database import init_db, get_db, Scan, Finding
+from .database import init_db, get_db, Scan, Finding, engine
 from .parsers import parse_checkov, parse_trivy, parse_trufflehog
 
-app = FastAPI(title="SecDashboard - Lightweight DevSecOps Portal", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize DB safely on startup with retries
+    init_db()
+    yield
+
+app = FastAPI(title="DefectDojo Lite - DevSecOps Portal", version="1.0.0", lifespan=lifespan)
 
 # Setup template and static folders
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+static_dir = os.path.join(BASE_DIR, "static")
+os.makedirs(static_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
-
-@app.on_event("startup")
-def on_startup():
-    init_db()
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+    db_status = "connected"
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+
+    return {
+        "status": "ok",
+        "database": db_status,
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 @app.post("/api/upload")
 async def upload_scan(
@@ -170,7 +186,6 @@ def get_findings(
 
     total_matched = query.count()
     results = query.order_by(
-        # Order by severity priority
         func.case(
             (Finding.severity == 'CRITICAL', 1),
             (Finding.severity == 'HIGH', 2),
