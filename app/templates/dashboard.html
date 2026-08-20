@@ -1,218 +1,236 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SecDashboard - DevSecOps Portal</title>
+  <title>DefectDojo Lite - DevSecOps Portal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script>
     tailwind.config = {
-      darkMode: 'class',
       theme: {
         extend: {
           colors: {
-            brand: {
-              50: '#f0fdf4',
-              500: '#22c55e',
-              600: '#16a34a',
-            },
-            darkBg: '#0f172a',
-            cardBg: '#1e293b',
-            cardBorder: '#334155'
+            dojo: {
+              red: '#d9534f',
+              orange: '#f0ad4e',
+              yellow: '#f39c12',
+              blue: '#337ab7',
+              gray: '#777777',
+              nav: '#2c3e50',
+              sidebar: '#34495e',
+              border: '#e2e8f0',
+              bg: '#f8fafc'
+            }
           }
         }
       }
     }
   </script>
+  <style>
+    body {
+      background-color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+  </style>
 </head>
-<body class="bg-darkBg text-slate-100 min-h-screen font-sans antialiased">
+<body class="text-slate-800 min-h-screen">
 
-  <!-- Top Navbar -->
-  <header class="border-b border-cardBorder bg-cardBg/80 backdrop-blur sticky top-0 z-30">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+  <!-- Top Dojo Header -->
+  <header class="bg-[#2c3e50] text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14">
       <div class="flex items-center space-x-3">
-        <div class="h-10 w-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-xl">
-          <i class="fa-solid fa-shield-halved"></i>
+        <div class="h-8 w-8 rounded bg-red-600 flex items-center justify-center font-bold text-white shadow">
+          <i class="fa-solid fa-shield-halved text-sm"></i>
         </div>
-        <div>
-          <h1 class="font-bold text-lg text-white">SecDashboard</h1>
-          <p class="text-xs text-slate-400">Terraform & DevSecOps Intelligence</p>
+        <div class="flex items-baseline space-x-2">
+          <h1 class="font-bold text-lg tracking-tight text-white">DefectDojo <span class="text-xs font-normal px-2 py-0.5 bg-slate-700 rounded text-slate-200">Lite</span></h1>
         </div>
       </div>
+      
       <div class="flex items-center space-x-4">
-        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-          <span class="w-1.5 h-1.5 mr-1.5 rounded-full bg-emerald-400 animate-pulse"></span> DB Connected
-        </span>
-        <button onclick="refreshData()" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium text-slate-200 transition flex items-center space-x-1.5">
+        <div class="flex items-center space-x-2 text-xs text-slate-300">
+          <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span>PostgreSQL Live</span>
+        </div>
+        <button onclick="refreshData()" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs font-medium text-white transition flex items-center space-x-1.5 shadow-sm">
           <i class="fa-solid fa-arrows-rotate"></i>
-          <span>Refresh</span>
+          <span>Sync Scans</span>
         </button>
       </div>
     </div>
   </header>
 
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-    
-    <!-- Stat Cards -->
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Overview Severity Metrics (DefectDojo White Cards with Colored Left Borders) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-      <div class="bg-cardBg border border-cardBorder rounded-2xl p-5 shadow-lg">
-        <div class="flex justify-between items-start">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Findings</p>
-            <h3 id="stat-total" class="text-3xl font-bold mt-2 text-white">0</h3>
-          </div>
-          <div class="p-2.5 rounded-xl bg-blue-500/10 text-blue-400">
-            <i class="fa-solid fa-layer-group text-lg"></i>
-          </div>
+      
+      <!-- Total -->
+      <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 border-l-4 border-l-slate-600 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-bold uppercase text-slate-500 tracking-wider">Total Findings</p>
+          <h3 id="stat-total" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+        </div>
+        <div class="p-2 rounded bg-slate-100 text-slate-600">
+          <i class="fa-solid fa-layer-group text-lg"></i>
         </div>
       </div>
 
-      <div class="bg-cardBg border border-red-500/30 rounded-2xl p-5 shadow-lg">
-        <div class="flex justify-between items-start">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-wider text-red-400">Critical</p>
-            <h3 id="stat-critical" class="text-3xl font-bold mt-2 text-red-400">0</h3>
-          </div>
-          <div class="p-2.5 rounded-xl bg-red-500/10 text-red-400">
-            <i class="fa-solid fa-triangle-exclamation text-lg"></i>
-          </div>
+      <!-- Critical -->
+      <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 border-l-4 border-l-red-600 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-bold uppercase text-red-600 tracking-wider">Critical</p>
+          <h3 id="stat-critical" class="text-2xl font-bold text-red-600 mt-1">0</h3>
+        </div>
+        <div class="p-2 rounded bg-red-50 text-red-600">
+          <i class="fa-solid fa-radiation text-lg"></i>
         </div>
       </div>
 
-      <div class="bg-cardBg border border-orange-500/30 rounded-2xl p-5 shadow-lg">
-        <div class="flex justify-between items-start">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-wider text-orange-400">High</p>
-            <h3 id="stat-high" class="text-3xl font-bold mt-2 text-orange-400">0</h3>
-          </div>
-          <div class="p-2.5 rounded-xl bg-orange-500/10 text-orange-400">
-            <i class="fa-solid fa-circle-exclamation text-lg"></i>
-          </div>
+      <!-- High -->
+      <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 border-l-4 border-l-orange-500 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-bold uppercase text-orange-600 tracking-wider">High</p>
+          <h3 id="stat-high" class="text-2xl font-bold text-orange-600 mt-1">0</h3>
+        </div>
+        <div class="p-2 rounded bg-orange-50 text-orange-600">
+          <i class="fa-solid fa-triangle-exclamation text-lg"></i>
         </div>
       </div>
 
-      <div class="bg-cardBg border border-yellow-500/30 rounded-2xl p-5 shadow-lg">
-        <div class="flex justify-between items-start">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-wider text-yellow-400">Medium</p>
-            <h3 id="stat-medium" class="text-3xl font-bold mt-2 text-yellow-400">0</h3>
-          </div>
-          <div class="p-2.5 rounded-xl bg-yellow-500/10 text-yellow-400">
-            <i class="fa-solid fa-triangle-exclamation text-lg"></i>
-          </div>
+      <!-- Medium -->
+      <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 border-l-4 border-l-amber-500 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-bold uppercase text-amber-600 tracking-wider">Medium</p>
+          <h3 id="stat-medium" class="text-2xl font-bold text-amber-600 mt-1">0</h3>
+        </div>
+        <div class="p-2 rounded bg-amber-50 text-amber-600">
+          <i class="fa-solid fa-circle-exclamation text-lg"></i>
         </div>
       </div>
 
-      <div class="bg-cardBg border border-cardBorder rounded-2xl p-5 shadow-lg">
-        <div class="flex justify-between items-start">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Low / Info</p>
-            <h3 id="stat-low" class="text-3xl font-bold mt-2 text-slate-300">0</h3>
-          </div>
-          <div class="p-2.5 rounded-xl bg-slate-500/10 text-slate-400">
-            <i class="fa-solid fa-info-circle text-lg"></i>
-          </div>
+      <!-- Low -->
+      <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 border-l-4 border-l-blue-500 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-bold uppercase text-blue-600 tracking-wider">Low / Info</p>
+          <h3 id="stat-low" class="text-2xl font-bold text-blue-600 mt-1">0</h3>
+        </div>
+        <div class="p-2 rounded bg-blue-50 text-blue-600">
+          <i class="fa-solid fa-circle-info text-lg"></i>
         </div>
       </div>
+
     </div>
 
-    <!-- Charts Row -->
+    <!-- Analytics Charts in White Containers -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="bg-cardBg border border-cardBorder rounded-2xl p-5 shadow-lg">
-        <h4 class="font-semibold text-slate-200 mb-4 flex items-center space-x-2">
-          <i class="fa-solid fa-chart-pie text-emerald-400"></i>
-          <span>Severity Distribution</span>
+      <div class="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+        <h4 class="text-sm font-bold text-slate-700 mb-3 pb-2 border-b border-slate-100 flex items-center space-x-2">
+          <i class="fa-solid fa-chart-pie text-red-500"></i>
+          <span>Severity Breakdown</span>
         </h4>
-        <div class="h-56 relative flex items-center justify-center">
+        <div class="h-52 relative flex items-center justify-center">
           <canvas id="severityChart"></canvas>
         </div>
       </div>
 
-      <div class="bg-cardBg border border-cardBorder rounded-2xl p-5 shadow-lg">
-        <h4 class="font-semibold text-slate-200 mb-4 flex items-center space-x-2">
-          <i class="fa-solid fa-toolbox text-blue-400"></i>
+      <div class="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+        <h4 class="text-sm font-bold text-slate-700 mb-3 pb-2 border-b border-slate-100 flex items-center space-x-2">
+          <i class="fa-solid fa-toolbox text-blue-500"></i>
           <span>Findings by Tool</span>
         </h4>
-        <div class="h-56 relative flex items-center justify-center">
+        <div class="h-52 relative flex items-center justify-center">
           <canvas id="toolChart"></canvas>
         </div>
       </div>
 
-      <div class="bg-cardBg border border-cardBorder rounded-2xl p-5 shadow-lg">
-        <h4 class="font-semibold text-slate-200 mb-4 flex items-center space-x-2">
-          <i class="fa-solid fa-folder-tree text-purple-400"></i>
-          <span>Top Repositories</span>
+      <div class="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+        <h4 class="text-sm font-bold text-slate-700 mb-3 pb-2 border-b border-slate-100 flex items-center space-x-2">
+          <i class="fa-solid fa-folder-tree text-indigo-500"></i>
+          <span>Findings by Repository</span>
         </h4>
-        <div class="h-56 relative flex items-center justify-center">
+        <div class="h-52 relative flex items-center justify-center">
           <canvas id="repoChart"></canvas>
         </div>
       </div>
     </div>
 
-    <!-- Filters & Search -->
-    <div class="bg-cardBg border border-cardBorder rounded-2xl p-5 shadow-lg space-y-4">
-      <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div class="relative w-full sm:w-80">
-          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400"></i>
+    <!-- Filter Toolbar -->
+    <div class="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+        
+        <div class="relative w-full md:w-80">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-sm"></i>
           <input id="searchInput" type="text" placeholder="Search rules, paths, resources..." 
                  oninput="debounceSearch()"
-                 class="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition">
+                 class="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 transition">
         </div>
 
-        <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
           <!-- Tool Filter -->
-          <select id="toolFilter" onchange="loadFindings()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
-            <option value="ALL">All Tools</option>
-            <option value="checkov">Checkov</option>
-            <option value="trivy">Trivy</option>
-            <option value="trufflehog">TruffleHog</option>
-          </select>
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-semibold text-slate-500 uppercase">Tool:</span>
+            <select id="toolFilter" onchange="loadFindings()" class="bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-blue-500">
+              <option value="ALL">All Tools</option>
+              <option value="checkov">Checkov</option>
+              <option value="trivy">Trivy</option>
+              <option value="trufflehog">TruffleHog</option>
+            </select>
+          </div>
 
           <!-- Severity Filter -->
-          <select id="severityFilter" onchange="loadFindings()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
-            <option value="ALL">All Severities</option>
-            <option value="CRITICAL">Critical</option>
-            <option value="HIGH">High</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="LOW">Low</option>
-          </select>
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-semibold text-slate-500 uppercase">Severity:</span>
+            <select id="severityFilter" onchange="loadFindings()" class="bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-blue-500">
+              <option value="ALL">All Severities</option>
+              <option value="CRITICAL">Critical</option>
+              <option value="HIGH">High</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="LOW">Low</option>
+            </select>
+          </div>
 
           <!-- Repo Filter -->
-          <select id="repoFilter" onchange="loadFindings()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
-            <option value="ALL">All Repositories</option>
-          </select>
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-semibold text-slate-500 uppercase">Repo:</span>
+            <select id="repoFilter" onchange="loadFindings()" class="bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-blue-500">
+              <option value="ALL">All Repositories</option>
+            </select>
+          </div>
         </div>
+
       </div>
     </div>
 
-    <!-- Findings Table -->
-    <div class="bg-cardBg border border-cardBorder rounded-2xl shadow-lg overflow-hidden">
-      <div class="px-6 py-4 border-b border-cardBorder flex items-center justify-between">
-        <h3 class="font-semibold text-lg text-white flex items-center space-x-2">
-          <i class="fa-solid fa-list-check text-emerald-400"></i>
-          <span>Security Findings</span>
+    <!-- Findings Table in DefectDojo Style -->
+    <div class="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+      <div class="px-5 py-3 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
+        <h3 class="font-bold text-sm text-slate-700 flex items-center space-x-2">
+          <i class="fa-solid fa-list text-slate-500"></i>
+          <span>Active Vulnerabilities</span>
         </h3>
-        <span id="resultCount" class="text-xs font-medium text-slate-400 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">0 findings</span>
+        <span id="resultCount" class="text-xs font-semibold text-slate-600 bg-slate-200 px-2.5 py-0.5 rounded">0 findings</span>
       </div>
 
       <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm text-slate-300">
-          <thead class="bg-slate-900/60 text-xs uppercase text-slate-400 font-semibold border-b border-cardBorder">
+        <table class="w-full text-left text-sm text-slate-700">
+          <thead class="bg-slate-100 text-xs uppercase text-slate-600 font-bold border-b border-slate-200">
             <tr>
-              <th class="px-6 py-3.5">Severity</th>
-              <th class="px-6 py-3.5">Rule / Issue</th>
-              <th class="px-6 py-3.5">Tool</th>
-              <th class="px-6 py-3.5">Repository & File</th>
-              <th class="px-6 py-3.5 text-right">Action</th>
+              <th class="px-4 py-3 w-28">Severity</th>
+              <th class="px-4 py-3">Finding / Rule</th>
+              <th class="px-4 py-3 w-32">Scanner</th>
+              <th class="px-4 py-3">Repository & Location</th>
+              <th class="px-4 py-3 text-right w-24">Action</th>
             </tr>
           </thead>
-          <tbody id="findingsTableBody" class="divide-y divide-cardBorder/60">
+          <tbody id="findingsTableBody" class="divide-y divide-slate-100">
             <tr>
-              <td colspan="5" class="px-6 py-12 text-center text-slate-400">
-                <i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-emerald-400"></i>
-                <p>Loading findings...</p>
+              <td colspan="5" class="px-4 py-8 text-center text-slate-500">
+                <i class="fa-solid fa-spinner fa-spin text-xl mb-2 text-blue-500"></i>
+                <p class="text-xs">Loading vulnerabilities...</p>
               </td>
             </tr>
           </tbody>
@@ -222,61 +240,61 @@
 
   </main>
 
-  <!-- Finding Detail Modal -->
-  <div id="detailModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
-    <div class="bg-cardBg border border-cardBorder rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-      <div class="px-6 py-4 border-b border-cardBorder flex items-center justify-between bg-slate-900/40">
-        <div class="flex items-center space-x-3">
-          <span id="modalSeverityBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase"></span>
-          <h3 id="modalTitle" class="font-bold text-base text-white truncate max-w-md"></h3>
+  <!-- DefectDojo Modal View -->
+  <div id="detailModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs hidden items-center justify-center p-4">
+    <div class="bg-white border border-slate-300 rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="px-5 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center space-x-2">
+          <span id="modalSeverityBadge" class="px-2 py-0.5 rounded text-xs font-bold uppercase text-white"></span>
+          <h3 id="modalTitle" class="font-bold text-sm text-slate-800 truncate max-w-md"></h3>
         </div>
-        <button onclick="closeModal()" class="text-slate-400 hover:text-white transition p-1">
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 transition p-1">
           <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
 
-      <div class="p-6 overflow-y-auto space-y-4 text-sm">
+      <div class="p-5 overflow-y-auto space-y-3 text-xs">
         <div>
-          <label class="text-xs font-semibold uppercase text-slate-400">Rule ID / Check</label>
-          <p id="modalRuleId" class="text-slate-200 font-mono text-xs mt-1 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800"></p>
+          <label class="font-bold uppercase text-slate-500">Rule ID / Benchmark</label>
+          <p id="modalRuleId" class="text-slate-800 font-mono mt-0.5 bg-slate-100 px-2.5 py-1 rounded border border-slate-200"></p>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="text-xs font-semibold uppercase text-slate-400">Repository</label>
-            <p id="modalRepo" class="text-slate-200 font-medium mt-1"></p>
+            <label class="font-bold uppercase text-slate-500">Repository</label>
+            <p id="modalRepo" class="text-slate-800 font-medium mt-0.5"></p>
           </div>
           <div>
-            <label class="text-xs font-semibold uppercase text-slate-400">Resource / Target</label>
-            <p id="modalResource" class="text-slate-200 font-mono text-xs mt-1 truncate"></p>
+            <label class="font-bold uppercase text-slate-500">Resource / Target</label>
+            <p id="modalResource" class="text-slate-800 font-mono mt-0.5 truncate"></p>
           </div>
         </div>
 
         <div>
-          <label class="text-xs font-semibold uppercase text-slate-400">File Location</label>
-          <p id="modalLocation" class="text-slate-200 font-mono text-xs mt-1 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800"></p>
+          <label class="font-bold uppercase text-slate-500">File Path</label>
+          <p id="modalLocation" class="text-slate-800 font-mono mt-0.5 bg-slate-100 px-2.5 py-1 rounded border border-slate-200"></p>
         </div>
 
         <div>
-          <label class="text-xs font-semibold uppercase text-slate-400">Description</label>
-          <p id="modalDescription" class="text-slate-300 mt-1 whitespace-pre-wrap leading-relaxed"></p>
+          <label class="font-bold uppercase text-slate-500">Description</label>
+          <p id="modalDescription" class="text-slate-700 mt-0.5 whitespace-pre-wrap leading-relaxed bg-slate-50 p-2.5 rounded border border-slate-200"></p>
         </div>
 
         <div id="modalCodeSection" class="hidden">
-          <label class="text-xs font-semibold uppercase text-slate-400">Code Snippet / Match</label>
-          <pre id="modalCodeSnippet" class="mt-1 p-3 bg-slate-950 border border-slate-800 text-emerald-400 rounded-lg font-mono text-xs overflow-x-auto"></pre>
+          <label class="font-bold uppercase text-slate-500">Code Snippet / Match</label>
+          <pre id="modalCodeSnippet" class="mt-0.5 p-2.5 bg-slate-900 text-emerald-400 rounded font-mono overflow-x-auto"></pre>
         </div>
 
-        <div id="modalGuideSection" class="hidden pt-2">
-          <a id="modalGuideUrl" href="#" target="_blank" class="inline-flex items-center space-x-2 text-emerald-400 hover:text-emerald-300 font-medium text-xs">
-            <span>Official Remediation Guide</span>
+        <div id="modalGuideSection" class="hidden pt-1">
+          <a id="modalGuideUrl" href="#" target="_blank" class="inline-flex items-center space-x-1.5 text-blue-600 hover:text-blue-800 font-semibold">
+            <span>View Remediation Guide</span>
             <i class="fa-solid fa-arrow-up-right-from-square"></i>
           </a>
         </div>
       </div>
 
-      <div class="px-6 py-3 border-t border-cardBorder bg-slate-900/40 flex justify-end">
-        <button onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm font-medium text-white transition">
+      <div class="px-5 py-2.5 border-t border-slate-200 bg-slate-50 flex justify-end">
+        <button onclick="closeModal()" class="px-3 py-1.5 rounded bg-slate-600 hover:bg-slate-700 text-xs font-medium text-white transition">
           Close
         </button>
       </div>
@@ -333,15 +351,16 @@
           labels: ['Critical', 'High', 'Medium', 'Low'],
           datasets: [{
             data: [data.critical, data.high, data.medium, data.low],
-            backgroundColor: ['#ef4444', '#f97316', '#eab308', '#64748b'],
-            borderWidth: 0
+            backgroundColor: ['#dc2626', '#ea580c', '#d97706', '#2563eb'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { position: 'bottom', labels: { color: '#94a3b8', boxWidth: 12 } }
+            legend: { position: 'bottom', labels: { color: '#475569', boxWidth: 10, font: { size: 11 } } }
           }
         }
       });
@@ -359,7 +378,7 @@
             label: 'Findings',
             data: toolCounts,
             backgroundColor: '#3b82f6',
-            borderRadius: 6
+            borderRadius: 4
           }]
         },
         options: {
@@ -367,8 +386,8 @@
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
-            y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+            x: { ticks: { color: '#64748b', font: { size: 11 } }, grid: { display: false } },
+            y: { ticks: { color: '#64748b', font: { size: 11 } }, grid: { color: '#f1f5f9' } }
           }
         }
       });
@@ -384,15 +403,16 @@
           labels: repoLabels,
           datasets: [{
             data: repoCounts,
-            backgroundColor: ['#a855f7', '#06b6d4', '#ec4899', '#10b981', '#f59e0b'],
-            borderWidth: 0
+            backgroundColor: ['#8b5cf6', '#06b6d4', '#ec4899', '#10b981', '#f59e0b'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { position: 'bottom', labels: { color: '#94a3b8', boxWidth: 10 } }
+            legend: { position: 'bottom', labels: { color: '#475569', boxWidth: 10, font: { size: 11 } } }
           }
         }
       });
@@ -427,9 +447,9 @@
       if (!findings || findings.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="5" class="px-6 py-12 text-center text-slate-400">
-              <i class="fa-solid fa-circle-check text-3xl mb-2 text-emerald-400"></i>
-              <p class="font-medium text-slate-300">No findings matched your criteria</p>
+            <td colspan="5" class="px-4 py-8 text-center text-slate-500">
+              <i class="fa-solid fa-circle-check text-2xl mb-1 text-emerald-500"></i>
+              <p class="text-xs font-semibold">No vulnerabilities found</p>
             </td>
           </tr>
         `;
@@ -437,29 +457,27 @@
       }
 
       tbody.innerHTML = findings.map((f, idx) => {
-        const sevClass = getSeverityBadge(f.severity);
+        const sevBadge = getSeverityBadge(f.severity);
         const toolBadge = getToolBadge(f.tool);
         return `
-          <tr class="hover:bg-slate-800/50 transition">
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span class="px-2.5 py-1 rounded-full text-xs font-bold uppercase ${sevClass}">
-                ${f.severity}
-              </span>
+          <tr class="hover:bg-slate-50 transition">
+            <td class="px-4 py-2.5 whitespace-nowrap">
+              ${sevBadge}
             </td>
-            <td class="px-6 py-4">
-              <div class="font-medium text-white line-clamp-1">${escapeHtml(f.title)}</div>
-              <div class="text-xs text-slate-400 font-mono mt-0.5">${escapeHtml(f.rule_id)}</div>
+            <td class="px-4 py-2.5">
+              <div class="font-bold text-slate-800 line-clamp-1">${escapeHtml(f.title)}</div>
+              <div class="text-xs text-slate-500 font-mono">${escapeHtml(f.rule_id)}</div>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap">
+            <td class="px-4 py-2.5 whitespace-nowrap">
               ${toolBadge}
             </td>
-            <td class="px-6 py-4">
-              <div class="font-medium text-slate-200">${escapeHtml(f.repository)}</div>
-              <div class="text-xs text-slate-400 font-mono truncate max-w-xs">${escapeHtml(f.file_path || 'N/A')}${f.line_number ? ':' + f.line_number : ''}</div>
+            <td class="px-4 py-2.5">
+              <div class="font-medium text-slate-700">${escapeHtml(f.repository)}</div>
+              <div class="text-xs text-slate-500 font-mono truncate max-w-xs">${escapeHtml(f.file_path || 'N/A')}${f.line_number ? ':' + f.line_number : ''}</div>
             </td>
-            <td class="px-6 py-4 text-right whitespace-nowrap">
-              <button onclick="viewDetails(${idx})" class="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 text-xs font-semibold transition">
-                Details
+            <td class="px-4 py-2.5 text-right whitespace-nowrap">
+              <button onclick="viewDetails(${idx})" class="px-2.5 py-1 rounded bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 text-xs font-medium transition">
+                View
               </button>
             </td>
           </tr>
@@ -469,19 +487,19 @@
 
     function getSeverityBadge(sev) {
       switch(sev) {
-        case 'CRITICAL': return 'bg-red-500/20 text-red-400 border border-red-500/30';
-        case 'HIGH': return 'bg-orange-500/20 text-orange-400 border border-orange-500/30';
-        case 'MEDIUM': return 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30';
-        default: return 'bg-slate-700/50 text-slate-300 border border-slate-600';
+        case 'CRITICAL': return '<span class="px-2 py-0.5 rounded text-xs font-bold uppercase bg-red-600 text-white">Critical</span>';
+        case 'HIGH': return '<span class="px-2 py-0.5 rounded text-xs font-bold uppercase bg-orange-500 text-white">High</span>';
+        case 'MEDIUM': return '<span class="px-2 py-0.5 rounded text-xs font-bold uppercase bg-amber-500 text-white">Medium</span>';
+        default: return '<span class="px-2 py-0.5 rounded text-xs font-bold uppercase bg-blue-600 text-white">Low</span>';
       }
     }
 
     function getToolBadge(tool) {
       switch(tool.toLowerCase()) {
-        case 'checkov': return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30">Checkov</span>';
-        case 'trivy': return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30">Trivy</span>';
-        case 'trufflehog': return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-500/20 text-red-300 border border-red-500/30">TruffleHog</span>';
-        default: return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-700 text-slate-300">${tool}</span>`;
+        case 'checkov': return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">Checkov</span>';
+        case 'trivy': return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">Trivy</span>';
+        case 'trufflehog': return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 border border-red-200">TruffleHog</span>';
+        default: return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800">${tool}</span>`;
       }
     }
 
@@ -498,7 +516,7 @@
 
       const sevBadge = document.getElementById('modalSeverityBadge');
       sevBadge.textContent = f.severity;
-      sevBadge.className = `px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${getSeverityBadge(f.severity)}`;
+      sevBadge.className = `px-2 py-0.5 rounded text-xs font-bold uppercase ${f.severity === 'CRITICAL' ? 'bg-red-600' : f.severity === 'HIGH' ? 'bg-orange-500' : f.severity === 'MEDIUM' ? 'bg-amber-500' : 'bg-blue-600'} text-white`;
 
       const codeSection = document.getElementById('modalCodeSection');
       if (f.code_snippet) {
