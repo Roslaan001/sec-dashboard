@@ -27,6 +27,14 @@ os.makedirs(static_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
+def normalize_repo_name(name: str) -> str:
+    if not name:
+        return "unknown"
+    n = name.strip().rstrip("/")
+    if n == "tf-essential-module":
+        return "tf-essentials-module"
+    return n
+
 @app.get("/api/health")
 def health():
     db_status = "connected"
@@ -52,6 +60,8 @@ async def upload_scan(
     db: Session = Depends(get_db)
 ):
     tool = tool.lower().strip()
+    repository = normalize_repo_name(repository)
+
     if tool not in ["checkov", "trivy", "trufflehog"]:
         raise HTTPException(status_code=400, detail="Supported tools: checkov, trivy, trufflehog")
 
@@ -73,6 +83,13 @@ async def upload_scan(
             raise HTTPException(status_code=400, detail=f"Failed to parse Trivy JSON: {str(e)}")
     elif tool == "trufflehog":
         raw_findings = parse_trufflehog(content_str, repository)
+
+    # Deactivate previous active findings for this (repo, tool) so scans don't duplicate
+    db.query(Finding).filter(
+        Finding.repository == repository,
+        Finding.tool == tool,
+        Finding.is_active == True
+    ).update({"is_active": False})
 
     # Count severities
     crit = sum(1 for f in raw_findings if f["severity"] == "CRITICAL")
@@ -96,7 +113,7 @@ async def upload_scan(
     db.add(scan)
     db.flush()
 
-    # Bulk insert findings
+    # Bulk insert new active findings
     finding_objs = [
         Finding(
             scan_id=scan.id,
@@ -134,6 +151,11 @@ async def upload_scan(
 
 @app.get("/api/stats")
 def get_stats(db: Session = Depends(get_db)):
+    # Normalize any legacy findings repo name
+    db.query(Finding).filter(Finding.repository == "tf-essential-module").update({"repository": "tf-essentials-module"})
+    db.query(Scan).filter(Scan.repository == "tf-essential-module").update({"repository": "tf-essentials-module"})
+    db.commit()
+
     total_findings = db.query(Finding).filter(Finding.is_active == True).count()
     crit = db.query(Finding).filter(Finding.is_active == True, Finding.severity == "CRITICAL").count()
     high = db.query(Finding).filter(Finding.is_active == True, Finding.severity == "HIGH").count()
@@ -162,7 +184,7 @@ def get_findings(
     repository: Optional[str] = None,
     severity: Optional[str] = None,
     search: Optional[str] = None,
-    limit: int = 200,
+    limit: int = 500,
     offset: int = 0,
     db: Session = Depends(get_db)
 ):
@@ -221,7 +243,7 @@ def get_findings(
     }
 
 @app.get("/api/scans")
-def get_scans(limit: int = 50, db: Session = Depends(get_db)):
+def get_scans(limit: int = 100, db: Session = Depends(get_db)):
     scans = db.query(Scan).order_by(desc(Scan.created_at)).limit(limit).all()
     return [
         {

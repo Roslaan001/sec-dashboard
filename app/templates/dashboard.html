@@ -13,15 +13,11 @@
         extend: {
           colors: {
             dojo: {
-              red: '#d9534f',
-              orange: '#f0ad4e',
-              yellow: '#f39c12',
-              blue: '#337ab7',
-              gray: '#777777',
-              nav: '#2c3e50',
-              sidebar: '#34495e',
-              border: '#e2e8f0',
-              bg: '#f8fafc'
+              red: '#dc2626',
+              orange: '#ea580c',
+              yellow: '#d97706',
+              blue: '#2563eb',
+              slate: '#475569'
             }
           }
         }
@@ -65,11 +61,10 @@
   <!-- Main Container -->
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
-    <!-- Overview Severity Metrics (DefectDojo White Cards with Colored Left Borders) -->
+    <!-- Overview Severity Metrics -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       
-      <!-- Total -->
-      <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 border-l-4 border-l-slate-600 flex items-center justify-between">
+      <div onclick="filterBySeverity('ALL')" class="cursor-pointer hover:shadow-md transition bg-white rounded-lg border border-slate-200 shadow-sm p-4 border-l-4 border-l-slate-600 flex items-center justify-between">
         <div>
           <p class="text-xs font-bold uppercase text-slate-500 tracking-wider">Total Findings</p>
           <h3 id="stat-total" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
@@ -79,8 +74,7 @@
         </div>
       </div>
 
-      <!-- Critical -->
-      <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 border-l-4 border-l-red-600 flex items-center justify-between">
+      <div onclick="filterBySeverity('CRITICAL')" class="cursor-pointer hover:shadow-md transition bg-white rounded-lg border border-slate-200 shadow-sm p-4 border-l-4 border-l-red-600 flex items-center justify-between">
         <div>
           <p class="text-xs font-bold uppercase text-red-600 tracking-wider">Critical</p>
           <h3 id="stat-critical" class="text-2xl font-bold text-red-600 mt-1">0</h3>
@@ -90,8 +84,7 @@
         </div>
       </div>
 
-      <!-- High -->
-      <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 border-l-4 border-l-orange-500 flex items-center justify-between">
+      <div onclick="filterBySeverity('HIGH')" class="cursor-pointer hover:shadow-md transition bg-white rounded-lg border border-slate-200 shadow-sm p-4 border-l-4 border-l-orange-500 flex items-center justify-between">
         <div>
           <p class="text-xs font-bold uppercase text-orange-600 tracking-wider">High</p>
           <h3 id="stat-high" class="text-2xl font-bold text-orange-600 mt-1">0</h3>
@@ -101,8 +94,7 @@
         </div>
       </div>
 
-      <!-- Medium -->
-      <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 border-l-4 border-l-amber-500 flex items-center justify-between">
+      <div onclick="filterBySeverity('MEDIUM')" class="cursor-pointer hover:shadow-md transition bg-white rounded-lg border border-slate-200 shadow-sm p-4 border-l-4 border-l-amber-500 flex items-center justify-between">
         <div>
           <p class="text-xs font-bold uppercase text-amber-600 tracking-wider">Medium</p>
           <h3 id="stat-medium" class="text-2xl font-bold text-amber-600 mt-1">0</h3>
@@ -112,8 +104,7 @@
         </div>
       </div>
 
-      <!-- Low -->
-      <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 border-l-4 border-l-blue-500 flex items-center justify-between">
+      <div onclick="filterBySeverity('LOW')" class="cursor-pointer hover:shadow-md transition bg-white rounded-lg border border-slate-200 shadow-sm p-4 border-l-4 border-l-blue-500 flex items-center justify-between">
         <div>
           <p class="text-xs font-bold uppercase text-blue-600 tracking-wider">Low / Info</p>
           <h3 id="stat-low" class="text-2xl font-bold text-blue-600 mt-1">0</h3>
@@ -125,7 +116,7 @@
 
     </div>
 
-    <!-- Analytics Charts in White Containers -->
+    <!-- Analytics Charts -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div class="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
         <h4 class="text-sm font-bold text-slate-700 mb-3 pb-2 border-b border-slate-100 flex items-center space-x-2">
@@ -158,10 +149,27 @@
       </div>
     </div>
 
-    <!-- Filter Toolbar -->
-    <div class="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+    <!-- Tool Tabs & Filter Toolbar -->
+    <div class="bg-white border border-slate-200 rounded-lg shadow-sm p-4 space-y-4">
+      
+      <!-- Top Tool Switcher Tabs -->
+      <div class="flex items-center border-b border-slate-200 pb-3 gap-2 overflow-x-auto">
+        <button id="tab-all" onclick="selectToolTab('ALL')" class="px-3.5 py-1.5 text-xs font-bold rounded-md bg-[#2c3e50] text-white shadow-sm transition">
+          All Tools (<span id="count-all">0</span>)
+        </button>
+        <button id="tab-checkov" onclick="selectToolTab('checkov')" class="px-3.5 py-1.5 text-xs font-bold rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+          Checkov (<span id="count-checkov">0</span>)
+        </button>
+        <button id="tab-trivy" onclick="selectToolTab('trivy')" class="px-3.5 py-1.5 text-xs font-bold rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+          Trivy (<span id="count-trivy">0</span>)
+        </button>
+        <button id="tab-trufflehog" onclick="selectToolTab('trufflehog')" class="px-3.5 py-1.5 text-xs font-bold rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+          TruffleHog (<span id="count-trufflehog">0</span>)
+        </button>
+      </div>
+
+      <!-- Filters & Search -->
       <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-        
         <div class="relative w-full md:w-80">
           <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-sm"></i>
           <input id="searchInput" type="text" placeholder="Search rules, paths, resources..." 
@@ -170,17 +178,6 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          <!-- Tool Filter -->
-          <div class="flex items-center space-x-2">
-            <span class="text-xs font-semibold text-slate-500 uppercase">Tool:</span>
-            <select id="toolFilter" onchange="loadFindings()" class="bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-blue-500">
-              <option value="ALL">All Tools</option>
-              <option value="checkov">Checkov</option>
-              <option value="trivy">Trivy</option>
-              <option value="trufflehog">TruffleHog</option>
-            </select>
-          </div>
-
           <!-- Severity Filter -->
           <div class="flex items-center space-x-2">
             <span class="text-xs font-semibold text-slate-500 uppercase">Severity:</span>
@@ -201,11 +198,11 @@
             </select>
           </div>
         </div>
-
       </div>
+
     </div>
 
-    <!-- Findings Table in DefectDojo Style -->
+    <!-- Findings Table -->
     <div class="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
       <div class="px-5 py-3 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
         <h3 class="font-bold text-sm text-slate-700 flex items-center space-x-2">
@@ -240,7 +237,7 @@
 
   </main>
 
-  <!-- DefectDojo Modal View -->
+  <!-- Detail Modal -->
   <div id="detailModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs hidden items-center justify-center p-4">
     <div class="bg-white border border-slate-300 rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
       <div class="px-5 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
@@ -303,6 +300,7 @@
 
   <script>
     let currentFindings = [];
+    let currentActiveTool = 'ALL';
     let severityChartInst = null;
     let toolChartInst = null;
     let repoChartInst = null;
@@ -323,6 +321,12 @@
         document.getElementById('stat-medium').textContent = data.medium;
         document.getElementById('stat-low').textContent = data.low;
 
+        // Tool counts on tabs
+        document.getElementById('count-all').textContent = data.total;
+        document.getElementById('count-checkov').textContent = data.by_tool['checkov'] || 0;
+        document.getElementById('count-trivy').textContent = data.by_tool['trivy'] || 0;
+        document.getElementById('count-trufflehog').textContent = data.by_tool['trufflehog'] || 0;
+
         // Populate Repo Filter dropdown
         const repoSelect = document.getElementById('repoFilter');
         const currentSelected = repoSelect.value;
@@ -339,6 +343,24 @@
       } catch (err) {
         console.error('Failed to load stats:', err);
       }
+    }
+
+    function selectToolTab(tool) {
+      currentActiveTool = tool;
+      ['all', 'checkov', 'trivy', 'trufflehog'].forEach(t => {
+        const el = document.getElementById(`tab-${t}`);
+        if (t === tool.toLowerCase()) {
+          el.className = 'px-3.5 py-1.5 text-xs font-bold rounded-md bg-[#2c3e50] text-white shadow-sm transition';
+        } else {
+          el.className = 'px-3.5 py-1.5 text-xs font-bold rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 transition';
+        }
+      });
+      loadFindings();
+    }
+
+    function filterBySeverity(sev) {
+      document.getElementById('severityFilter').value = sev;
+      loadFindings();
     }
 
     function renderCharts(data) {
@@ -403,7 +425,7 @@
           labels: repoLabels,
           datasets: [{
             data: repoCounts,
-            backgroundColor: ['#8b5cf6', '#06b6d4', '#ec4899', '#10b981', '#f59e0b'],
+            backgroundColor: ['#8b5cf6', '#06b6d4', '#ec4899', '#10b981', '#f59e0b', '#3b82f6'],
             borderWidth: 2,
             borderColor: '#ffffff'
           }]
@@ -419,7 +441,7 @@
     }
 
     async function loadFindings() {
-      const tool = document.getElementById('toolFilter').value;
+      const tool = currentActiveTool;
       const severity = document.getElementById('severityFilter').value;
       const repo = document.getElementById('repoFilter').value;
       const search = document.getElementById('searchInput').value.trim();
@@ -429,6 +451,7 @@
       if (severity !== 'ALL') params.append('severity', severity);
       if (repo !== 'ALL') params.append('repository', repo);
       if (search) params.append('search', search);
+      params.append('limit', '500');
 
       try {
         const res = await fetch(`/api/findings?${params.toString()}`);
@@ -449,7 +472,7 @@
           <tr>
             <td colspan="5" class="px-4 py-8 text-center text-slate-500">
               <i class="fa-solid fa-circle-check text-2xl mb-1 text-emerald-500"></i>
-              <p class="text-xs font-semibold">No vulnerabilities found</p>
+              <p class="text-xs font-semibold">No vulnerabilities found for this filter</p>
             </td>
           </tr>
         `;
