@@ -8,14 +8,13 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc, text
+from sqlalchemy import func, desc, text, case
 
 from .database import init_db, get_db, Scan, Finding, engine
 from .parsers import parse_checkov, parse_trivy, parse_trufflehog
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize DB safely on startup with retries
     init_db()
     yield
 
@@ -186,7 +185,7 @@ def get_findings(
 
     total_matched = query.count()
     results = query.order_by(
-        func.case(
+        case(
             (Finding.severity == 'CRITICAL', 1),
             (Finding.severity == 'HIGH', 2),
             (Finding.severity == 'MEDIUM', 3),
