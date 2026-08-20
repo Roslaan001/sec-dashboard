@@ -307,7 +307,8 @@
     let debounceTimer = null;
 
     async function initDashboard() {
-      await Promise.all([loadStats(), loadFindings()]);
+      await loadStats();
+      await loadFindings();
     }
 
     async function loadStats() {
@@ -315,28 +316,30 @@
         const res = await fetch('/api/stats');
         const data = await res.json();
 
-        document.getElementById('stat-total').textContent = data.total;
-        document.getElementById('stat-critical').textContent = data.critical;
-        document.getElementById('stat-high').textContent = data.high;
-        document.getElementById('stat-medium').textContent = data.medium;
-        document.getElementById('stat-low').textContent = data.low;
+        document.getElementById('stat-total').textContent = data.total || 0;
+        document.getElementById('stat-critical').textContent = data.critical || 0;
+        document.getElementById('stat-high').textContent = data.high || 0;
+        document.getElementById('stat-medium').textContent = data.medium || 0;
+        document.getElementById('stat-low').textContent = data.low || 0;
 
         // Tool counts on tabs
-        document.getElementById('count-all').textContent = data.total;
-        document.getElementById('count-checkov').textContent = data.by_tool['checkov'] || 0;
-        document.getElementById('count-trivy').textContent = data.by_tool['trivy'] || 0;
-        document.getElementById('count-trufflehog').textContent = data.by_tool['trufflehog'] || 0;
+        document.getElementById('count-all').textContent = data.total || 0;
+        document.getElementById('count-checkov').textContent = (data.by_tool && data.by_tool['checkov']) || 0;
+        document.getElementById('count-trivy').textContent = (data.by_tool && data.by_tool['trivy']) || 0;
+        document.getElementById('count-trufflehog').textContent = (data.by_tool && data.by_tool['trufflehog']) || 0;
 
         // Populate Repo Filter dropdown
         const repoSelect = document.getElementById('repoFilter');
-        const currentSelected = repoSelect.value;
+        const currentSelected = repoSelect.value || 'ALL';
         repoSelect.innerHTML = '<option value="ALL">All Repositories</option>';
-        Object.keys(data.by_repo).forEach(r => {
-          const opt = document.createElement('option');
-          opt.value = r;
-          opt.textContent = `${r} (${data.by_repo[r]})`;
-          repoSelect.appendChild(opt);
-        });
+        if (data.by_repo) {
+          Object.keys(data.by_repo).forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = r;
+            opt.textContent = `${r} (${data.by_repo[r]})`;
+            repoSelect.appendChild(opt);
+          });
+        }
         repoSelect.value = currentSelected;
 
         renderCharts(data);
@@ -349,10 +352,12 @@
       currentActiveTool = tool;
       ['all', 'checkov', 'trivy', 'trufflehog'].forEach(t => {
         const el = document.getElementById(`tab-${t}`);
-        if (t === tool.toLowerCase()) {
-          el.className = 'px-3.5 py-1.5 text-xs font-bold rounded-md bg-[#2c3e50] text-white shadow-sm transition';
-        } else {
-          el.className = 'px-3.5 py-1.5 text-xs font-bold rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 transition';
+        if (el) {
+          if (t === tool.toLowerCase()) {
+            el.className = 'px-3.5 py-1.5 text-xs font-bold rounded-md bg-[#2c3e50] text-white shadow-sm transition';
+          } else {
+            el.className = 'px-3.5 py-1.5 text-xs font-bold rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 transition';
+          }
         }
       });
       loadFindings();
@@ -372,7 +377,7 @@
         data: {
           labels: ['Critical', 'High', 'Medium', 'Low'],
           datasets: [{
-            data: [data.critical, data.high, data.medium, data.low],
+            data: [data.critical || 0, data.high || 0, data.medium || 0, data.low || 0],
             backgroundColor: ['#dc2626', '#ea580c', '#d97706', '#2563eb'],
             borderWidth: 2,
             borderColor: '#ffffff'
@@ -390,8 +395,8 @@
       // 2. Tool Chart
       const toolCtx = document.getElementById('toolChart').getContext('2d');
       if (toolChartInst) toolChartInst.destroy();
-      const toolLabels = Object.keys(data.by_tool);
-      const toolCounts = Object.values(data.by_tool);
+      const toolLabels = Object.keys(data.by_tool || {});
+      const toolCounts = Object.values(data.by_tool || {});
       toolChartInst = new Chart(toolCtx, {
         type: 'bar',
         data: {
@@ -417,8 +422,8 @@
       // 3. Repo Chart
       const repoCtx = document.getElementById('repoChart').getContext('2d');
       if (repoChartInst) repoChartInst.destroy();
-      const repoLabels = Object.keys(data.by_repo);
-      const repoCounts = Object.values(data.by_repo);
+      const repoLabels = Object.keys(data.by_repo || {});
+      const repoCounts = Object.values(data.by_repo || {});
       repoChartInst = new Chart(repoCtx, {
         type: 'pie',
         data: {
@@ -442,22 +447,22 @@
 
     async function loadFindings() {
       const tool = currentActiveTool;
-      const severity = document.getElementById('severityFilter').value;
-      const repo = document.getElementById('repoFilter').value;
-      const search = document.getElementById('searchInput').value.trim();
+      const severity = document.getElementById('severityFilter') ? document.getElementById('severityFilter').value : 'ALL';
+      const repo = document.getElementById('repoFilter') ? document.getElementById('repoFilter').value : 'ALL';
+      const search = document.getElementById('searchInput') ? document.getElementById('searchInput').value.trim() : '';
 
       const params = new URLSearchParams();
-      if (tool !== 'ALL') params.append('tool', tool);
-      if (severity !== 'ALL') params.append('severity', severity);
-      if (repo !== 'ALL') params.append('repository', repo);
+      if (tool && tool !== 'ALL') params.append('tool', tool);
+      if (severity && severity !== 'ALL') params.append('severity', severity);
+      if (repo && repo !== 'ALL') params.append('repository', repo);
       if (search) params.append('search', search);
       params.append('limit', '500');
 
       try {
         const res = await fetch(`/api/findings?${params.toString()}`);
         const data = await res.json();
-        currentFindings = data.findings;
-        document.getElementById('resultCount').textContent = `${data.total} findings`;
+        currentFindings = data.findings || [];
+        document.getElementById('resultCount').textContent = `${data.total || 0} findings`;
 
         renderTable(currentFindings);
       } catch (err) {
@@ -518,7 +523,7 @@
     }
 
     function getToolBadge(tool) {
-      switch(tool.toLowerCase()) {
+      switch((tool || '').toLowerCase()) {
         case 'checkov': return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">Checkov</span>';
         case 'trivy': return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">Trivy</span>';
         case 'trufflehog': return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 border border-red-200">TruffleHog</span>';
